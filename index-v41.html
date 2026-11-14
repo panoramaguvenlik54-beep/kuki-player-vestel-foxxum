@@ -83,13 +83,33 @@
   <h2 id="detail-title">Seçilen İçerik</h2><p id="detail-info"></p><p id="detail-desc"></p>
   <button class="action nav" type="button" id="detail-play">▶ HEMEN BAŞLAT</button>
   <button class="action nav" type="button" id="detail-fav">♥ FAVORİ</button>
-  <div id="detail-episodes"></div>
  </div></div>
+ <div id="detail-series-browser" class="hidden">
+  <div id="detail-season-tabs"></div>
+  <div id="detail-episodes"></div>
+ </div>
 </section>
 <section class="screen" id="play-screen">
  <video id="movie-video" preload="none" playsinline></video>
  <div id="play-hint">KUKİ PLAYER • Video yükleniyor...</div>
- <div id="play-transport"><button class="action nav" id="play-toggle">DURAKLAT / OYNAT</button><button class="action nav" id="play-stop">GERİ</button><span id="play-time">00:00</span></div>
+ <div id="play-transport">
+  <div class="play-progress-line">
+   <span id="play-time">00:00 / --:--</span>
+   <input id="play-progress" class="nav" type="range" min="0" max="1000" value="0" step="1" aria-label="Video süre çizgisi">
+  </div>
+  <div class="play-control-buttons">
+   <button class="play-control nav" id="play-rewind" type="button" aria-label="10 saniye geri">◀◀ <small>10 sn</small></button>
+   <button class="play-control nav" id="play-toggle" type="button" aria-label="Oynat duraklat">❚❚ <small>DURAKLAT</small></button>
+   <button class="play-control nav" id="play-forward" type="button" aria-label="10 saniye ileri">▶▶ <small>10 sn</small></button>
+   <button class="play-control nav" id="play-audio" type="button">♫ <small>SES DİLİ</small></button>
+   <button class="play-control nav" id="play-subtitle" type="button">▤ <small>ALTYAZI</small></button>
+   <button class="play-control nav" id="play-stop" type="button">↩ <small>GERİ</small></button>
+  </div>
+  <div id="play-track-options" class="hidden">
+   <h3 id="play-track-heading">Ses Dili</h3>
+   <div id="play-track-list"></div>
+  </div>
+ </div>
 </section>
 <section class="screen" id="settings">
  <div class="topbar"><button class="back nav" data-go="home">← Menü</button><h1>Ayarlar</h1></div>
