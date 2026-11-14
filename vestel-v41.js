@@ -473,8 +473,10 @@ function confirmExit(){
   if(document.visibilityState==='hidden')return;
   try{
    if(window.history&&window.history.length>1){
-    if(remoteBackGuard&&window.history.length>2)window.history.go(-2);
-    else window.history.back();
+    // This branch runs ONLY after the user explicitly chose EVET.
+    // New history guards may add many internal entries; -2 would
+    // merely return to a menu, not exit the Web App Tester.
+    window.history.go(-999);
     return;
    }
   }catch(e){}
