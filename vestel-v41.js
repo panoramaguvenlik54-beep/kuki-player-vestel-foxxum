@@ -29,7 +29,7 @@ function exitLiveFullscreen(){
  liveFullscreen=false;
  el('live').className=el('live').className.replace(/\s*fullscreen\b/g,'');
 }
-function switchTo(id){if(!el(id))return;exitLiveFullscreen();stopVideo();var all=document.querySelectorAll('.screen'),i;for(i=0;i<all.length;i++)all[i].className=all[i].className.replace(/\s*active\b/g,'');el(id).className+=' active';screen=id;if(id==='home'){tickClock();if(dataLoaded)updateHero();}setTimeout(focusFirst,20);}
+function switchTo(id){if(!el(id))return;exitLiveFullscreen();if(screen==='live'&&id!=='live')currentLive=null;stopVideo();var all=document.querySelectorAll('.screen'),i;for(i=0;i<all.length;i++)all[i].className=all[i].className.replace(/\s*active\b/g,'');el(id).className+=' active';screen=id;if(id==='home'){tickClock();if(dataLoaded)updateHero();}setTimeout(focusFirst,20);}
 function directional(key){
  var current=document.activeElement,all=activeButtons(),idx=all.indexOf?all.indexOf(current):Array.prototype.indexOf.call(all,current);
  if(!all.length)return;
