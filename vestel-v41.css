@@ -114,3 +114,13 @@ header{height:70px;padding:13px 40px;display:-webkit-box;display:flex;-webkit-bo
 #home .hero.has-posters #hero-art-frame{width:39%}
 #home .hero.has-posters #hero-dots{right:12%;bottom:6px}
 }
+
+/* Vestel MB230: confirm the app exit from the home screen. */
+#exit-dialog{position:fixed;top:0;right:0;bottom:0;left:0;z-index:100;background:rgba(4,0,8,.91);display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}
+#exit-card{width:72%;max-width:810px;text-align:center;padding:34px 22px 25px;border:2px solid #b756ce;border-radius:19px;background:#230d35;box-shadow:0 0 42px rgba(170,54,216,.40)}
+#exit-card h2{font-weight:800;font-size:28px;line-height:1.35;margin:28px 0 25px;color:#fff}
+#exit-card .exit-actions{display:-webkit-box;display:flex;-webkit-box-pack:center;justify-content:center}
+#exit-card .exit-actions button{min-width:150px;margin:0 14px;border:2px solid #9745b1}
+#exit-card .exit-actions button:focus{background:#922eb1!important;border-color:#fff!important;box-shadow:0 0 20px #ba4de0!important}
+#exit-feedback{min-height:20px;margin:22px 0 0;color:#e9c4f4;font-size:15px}
+@media(max-width:950px){#exit-card{width:85%;padding:26px 15px}#exit-card h2{font-size:23px;margin:22px 0}#exit-card .exit-actions button{min-width:115px;margin:0 8px}}
