@@ -18,6 +18,26 @@ function del(k){try{window.localStorage.removeItem(k);}catch(e){}}
 function escapeText(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function validDevice(x){return !!(x&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x.device_id||'')&&/^[0-9a-f]{64}$/i.test(x.device_token||''));}
 function loadDevice(){var v=null;try{v=JSON.parse(read(STORE));}catch(e){}return validDevice(v)?v:null;}
+function legalCookieAccepted(){
+ try{return /(?:^|;\s*)kuki_foxxum_legal_v1=1(?:;|$)/.test(document.cookie||'');}
+ catch(e){return false;}
+}
+function rememberLegal(){
+ save(LEGAL,'1');
+ try{document.cookie='kuki_foxxum_legal_v1=1; expires=Fri, 31 Dec 2037 23:59:59 GMT; path=/; SameSite=Lax';}catch(e){}
+ if(device&&validDevice(device)){
+  device.legal_accepted_v4=true;
+  save(STORE,JSON.stringify(device));
+ }
+}
+function acceptedLegal(){
+ if(read(LEGAL)==='1'||legalCookieAccepted())return true;
+ if(device&&device.legal_accepted_v4===true)return true;
+ // An already-paired TV has previously passed through the legal acceptance
+ // screen in our deployed V4.x flow. Keep its identity and avoid prompting
+ // on each Web App Tester launch if only the legal flag was lost.
+ return !!(device&&validDevice(device)&&/^[0-9]{6}$/.test(String(device.activation_code||'')));
+}
 function toast(msg){var node=el('toast');node.textContent=msg;node.style.display='block';if(overlayTimer)clearTimeout(overlayTimer);overlayTimer=setTimeout(function(){node.style.display='none';},5500);}
 function activeButtons(){var all=el(screen).querySelectorAll('.nav'),out=[],i;for(i=0;i<all.length;i++)if(!all[i].disabled&&all[i].offsetWidth>0)out.push(all[i]);return out;}
 function focusFirst(){var buttons=activeButtons();if(buttons.length){try{buttons[0].focus();}catch(e){}}}
@@ -410,6 +430,7 @@ function dismissExitDialog(){
 }
 function confirmExit(){
  if(!exitDialogOpen||exitBusy)return;
+ rememberLegal();
  exitBusy=true;
  say('exit-feedback','Uygulamadan çıkılıyor...');
  // Native method is part of Smart TV Alliance. Web App Tester may not expose it.
@@ -487,7 +508,7 @@ function installHandlers(){
  var go=document.querySelectorAll('[data-go]'),i;
  for(i=0;i<go.length;i++)go[i].onclick=function(){var id=this.getAttribute('data-go');switchTo(id);if((id==='live'||id==='movies'||id==='series')&&!dataLoaded&&authorized&&!loading)fetchCatalog();};
  el('legal-text').onscroll=legalUpdate;
- el('legal-accept').onclick=function(){if(this.disabled)return;save(LEGAL,'1');switchTo('pair');beginPair();};
+ el('legal-accept').onclick=function(){if(this.disabled)return;rememberLegal();switchTo('pair');beginPair();};
  el('pair-retry').onclick=beginPair;
  el('pair-demo').onclick=function(){authorized=false;switchTo('home');updateHero();};
  el('live-search').oninput=function(){drawType('live');};
@@ -512,7 +533,7 @@ function installHandlers(){
 }
 function boot(){
  installHandlers();say('parent-label',read('kuki_vestel_parental_v1')==='off'?'Kapalı':'Açık');device=loadDevice();
- if(read(LEGAL)==='1'){switchTo('pair');if(device&&device.activation_code)say('pair-code',device.activation_code);beginPair();}
+ if(acceptedLegal()){rememberLegal();switchTo('pair');if(device&&device.activation_code)say('pair-code',device.activation_code);beginPair();}
  else{switchTo('legal');el('legal-text').focus();legalUpdate();}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
