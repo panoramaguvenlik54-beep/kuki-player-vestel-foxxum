@@ -124,3 +124,41 @@ header{height:70px;padding:13px 40px;display:-webkit-box;display:flex;-webkit-bo
 #exit-card .exit-actions button:focus{background:#922eb1!important;border-color:#fff!important;box-shadow:0 0 20px #ba4de0!important}
 #exit-feedback{min-height:20px;margin:22px 0 0;color:#e9c4f4;font-size:15px}
 @media(max-width:950px){#exit-card{width:85%;padding:26px 15px}#exit-card h2{font-size:23px;margin:22px 0}#exit-card .exit-actions button{min-width:115px;margin:0 8px}}
+
+/* Vestel season selector: use the lower screen width, not the small detail sidebar. */
+#detail.series-mode .detail-layout{height:35%;margin:12px 3% 0}
+#detail.series-mode #detail-poster{width:18%}
+#detail.series-mode #detail-body{width:80%;padding:0 8px}
+#detail.series-mode #detail-desc{max-height:37%;line-height:1.35;font-size:15px}
+#detail.series-mode #detail-body h2{font-size:27px;margin:0 0 5px}
+#detail.series-mode #detail-body .action{margin:5px 6px;min-width:150px;padding:8px 12px}
+#detail-series-browser{position:absolute;left:3%;right:3%;bottom:4%;height:46%;overflow:hidden;background:rgba(17,6,27,.95);border:1px solid #713085;border-radius:13px;padding:12px 16px}
+#detail-season-tabs{height:64px;white-space:nowrap;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid #5e2b71;padding:0 2px 9px}
+.season-tab{display:inline-block;white-space:nowrap;margin:3px 7px 3px 0;background:#39144e;border:2px solid #75318e;border-radius:9px;color:#fff;font-weight:bold;font-size:17px;padding:10px 17px}
+.season-tab.active{background:#9138ad;border-color:#fac8ff}
+#detail-episodes{height:calc(100% - 65px);overflow-y:auto;overflow-x:hidden;padding:8px 2px 5px}
+.episode-choice{width:31.7%;display:inline-block;vertical-align:top;white-space:normal;text-align:left;min-height:58px;margin:5px .8%;padding:10px 12px;font-weight:bold;background:#311444;color:#fff;border:2px solid #69317e;border-radius:10px;font-size:15px;overflow:hidden;text-overflow:ellipsis}
+.episode-choice:focus{background:#74288e;border-color:#fff}
+#play-screen{background:#000}
+#play-screen #movie-video{width:100%;height:100%;object-fit:contain;background:#000}
+#play-transport{position:absolute;bottom:3%;left:4%;right:4%;z-index:6;text-align:center;background:rgba(11,3,24,.94);padding:15px 19px;border:1px solid #8740a7;border-radius:16px;box-shadow:0 0 35px rgba(0,0,0,.65)}
+.play-progress-line{text-align:left;margin:0 4px 9px}
+#play-time{font-weight:bold;font-size:16px;display:block;color:#f0d9f5;text-align:right;margin:0 0 5px}
+#play-progress{display:block;width:100%;height:21px;accent-color:#da4ff7;background:transparent;margin:4px 0 9px}
+.play-control-buttons{display:-webkit-box;display:flex;-webkit-box-pack:center;justify-content:center;-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.play-control{display:inline-block;color:white;background:#35134f;border:2px solid #8543a1;border-radius:10px;padding:8px 13px;margin:3px .5%;min-width:13%;font-size:23px;font-weight:bold;line-height:1.2}
+.play-control small{display:block;font-size:11px;letter-spacing:.3px;font-weight:bold;margin-top:4px}
+.play-control:focus{background:#8233a0;border-color:white}
+#play-hint{z-index:4}
+#play-track-options{border-top:1px solid #6c327c;padding:8px 0 2px;max-height:32vh;overflow:auto}
+#play-track-heading{font-size:17px;margin:5px 0 8px}
+#play-track-list{max-height:20vh;overflow-y:auto}
+.play-track-choice{margin:4px;padding:10px 14px;border:1px solid #9c58ad;border-radius:8px;color:white;background:#3d194f;font-size:15px}
+@media(max-height:600px){
+ #detail.series-mode .detail-layout{height:30%}
+ #detail-series-browser{height:49%}
+ .season-tab{padding:6px 13px}
+ .episode-choice{min-height:45px;padding:7px}
+ #play-transport{bottom:1%;padding:8px}
+ .play-control{padding:4px 10px}
+}
