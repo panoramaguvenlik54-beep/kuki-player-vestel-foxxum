@@ -8,6 +8,7 @@ var server='',username='',password='', dataLoaded=false, loading=false, overlayT
 var lists={live:[],movies:[],series:[]},cats={live:[],movies:[],series:[]};
 var choice={live:'all',movies:'all',series:'all'}, lastType='movies',selected=null,episode=null;
 var favorites={},cache={},liveFullscreen=false;
+var exitDialogOpen=false,exitBeforeFocus=null,exitBusy=false;
 var heroMovies=[],heroIndex=0,heroTimer=null; 
 function el(id){return document.getElementById(id);}
 function say(id,s){if(el(id))el(id).textContent=String(s||'');}
@@ -391,9 +392,60 @@ function logout(){
  });
 }
 function legalUpdate(){var area=el('legal-text');var end=area.scrollTop+area.clientHeight>=area.scrollHeight-12;el('legal-accept').disabled=!end;say('legal-status',end?'Bilgilendirmeyi okudunuz. Kabul ederek devam edebilirsiniz.':'Kumandanın AŞAĞI tuşuyla metni sonuna kadar okuyunuz.');}
+
+function showExitDialog(){
+ if(screen!=='home'||exitDialogOpen)return;
+ exitDialogOpen=true;exitBusy=false;exitBeforeFocus=document.activeElement;
+ say('exit-feedback','');
+ el('exit-dialog').className='';
+ try{el('exit-no').focus();}catch(e){}
+}
+function dismissExitDialog(){
+ if(!exitDialogOpen)return;
+ exitDialogOpen=false;exitBusy=false;
+ el('exit-dialog').className='hidden';
+ say('exit-feedback','');
+ try{if(exitBeforeFocus&&exitBeforeFocus.focus)exitBeforeFocus.focus();else focusFirst();}catch(e){}
+ exitBeforeFocus=null;
+}
+function confirmExit(){
+ if(!exitDialogOpen||exitBusy)return;
+ exitBusy=true;
+ say('exit-feedback','Uygulamadan çıkılıyor...');
+ // Native method is part of Smart TV Alliance. Web App Tester may not expose it.
+ try{
+  if(window.SmartTvA_API&&typeof window.SmartTvA_API.exit==='function'){
+   window.SmartTvA_API.exit();
+  }
+ }catch(e){}
+ try{window.close();}catch(e){}
+ window.setTimeout(function(){
+  if(!exitDialogOpen)return;
+  if(document.visibilityState==='hidden')return;
+  try{
+   if(window.history&&window.history.length>1){window.history.back();return;}
+  }catch(e){}
+  say('exit-feedback','Otomatik çıkış TV tarafından engellendi. Kumandanın EXIT veya HOME tuşuyla çıkabilirsiniz.');
+  exitBusy=false;
+ },650);
+}
+
 function onKey(e){
  e=e||window.event;
  var key=e.keyCode||e.which;
+ if(exitDialogOpen){
+  if(key===8||key===27||key===461||key===10009||key===166){
+   dismissExitDialog();
+  }else if(key===37||key===38||key===39||key===40){
+   try{(document.activeElement===el('exit-no')?el('exit-yes'):el('exit-no')).focus();}catch(er){}
+  }else if(key===13){
+   if(document.activeElement===el('exit-yes'))confirmExit();
+   else dismissExitDialog();
+  }
+  if(e.preventDefault)e.preventDefault();
+  if(e.stopPropagation)e.stopPropagation();
+  return false;
+ }
  if(screen==='legal'){
   if(key===40||key===34){el('legal-text').scrollTop+=100;legalUpdate();if(!el('legal-accept').disabled)el('legal-accept').focus();}
   else if(key===38||key===33){el('legal-text').scrollTop-=95;legalUpdate();}
@@ -420,7 +472,7 @@ function onKey(e){
   }
   if(key===13||key===37||key===39){if(e.preventDefault)e.preventDefault();return false;}
  }
- if(key===8||key===27||key===461||key===10009||key===166){if(screen==='play-screen')switchTo('detail');else if(screen==='detail')switchTo(lastType);else if(screen!=='home'&&screen!=='pair')switchTo('home');else if(screen==='home'){toast('KUKİ PLAYER ana menü');}if(e.preventDefault)e.preventDefault();return false;}
+ if(key===8||key===27||key===461||key===10009||key===166){if(screen==='play-screen')switchTo('detail');else if(screen==='detail')switchTo(lastType);else if(screen!=='home'&&screen!=='pair')switchTo('home');else if(screen==='home'){showExitDialog();}if(e.preventDefault)e.preventDefault();return false;}
  if(screen==='play-screen'&&(key===415||key===19||key===13)){el('play-toggle').click();if(e.preventDefault)e.preventDefault();return false;}
  if((key===37||key===38||key===39||key===40)&&screen!=='play-screen'){
   if(document.activeElement&&document.activeElement.tagName==='INPUT'&&key===37)return;
@@ -444,6 +496,8 @@ function installHandlers(){
  el('detail-back').onclick=function(){switchTo(lastType);};
  el('detail-play').onclick=function(){if(selected)startVOD('movies',selected);};
  el('detail-fav').onclick=function(){if(selected){toggleFav(lastType,selected);say('detail-fav',hasFav(lastType,selected)?'♥ FAVORİDEN ÇIKAR':'♥ FAVORİ');}};
+ el('exit-yes').onclick=confirmExit;
+ el('exit-no').onclick=dismissExitDialog;
  el('play-stop').onclick=function(){switchTo('detail');};
  el('play-toggle').onclick=function(){var v=el('movie-video');try{if(v.paused)v.play();else v.pause();}catch(e){}};
  el('setting-refresh').onclick=refresh;
