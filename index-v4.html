@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>KUKİ PLAYER | Vestel 4.0</title>
+<link rel="stylesheet" href="./vestel-v4.css">
+</head>
+<body>
+<section class="screen active" id="legal">
+ <div class="card"><div class="brand"><span class="mark">&#9654;</span>KUKİ <span>PLAYER</span></div><h1>YASAL BİLGİLENDİRME</h1>
+  <div id="legal-text" tabindex="0">
+   <p><strong>1. Uygulamanın amacı:</strong> KUKİ PLAYER yalnızca medya oynatıcıdır. Kendi başına televizyon yayını, kanal, film, dizi, abonelik veya oynatma listesi sunmaz; içerik barındırmaz ve dağıtmaz.</p>
+   <p><strong>2. Kaynaklar:</strong> Üçüncü taraf sunucu ve medya bağlantılarının kullanımına ilişkin tüm hak ve izinler kullanıcı ile içerik sağlayıcısı arasındadır.</p>
+   <p><strong>3. Sorumluluk:</strong> Kullanıcı eriştiği içeriklere hukuken izinli olduğundan, gerekli telif/yayın haklarına sahip olduğundan emin olmalıdır. Hak sahibi izni olmadan içeriklere erişilmemelidir.</p>
+   <p><strong>4. Kabul:</strong> Devam ederek bilgilendirmeyi okuyup anladığınızı ve uygulamayı yasal amaçlarla kullanacağınızı kabul edersiniz. Emredici tüketici haklarınız saklıdır.</p>
+   <p>Bu bilgilendirme hukuki görüş niteliğinde değildir; yayımlanmadan önce hukuk uzmanı tarafından incelenmelidir.</p>
+  </div><p id="legal-status">Kumandanın AŞAĞI tuşuyla metni sonuna kadar okuyunuz.</p>
+  <button class="action nav" id="legal-accept" type="button" disabled>KABUL EDİYORUM VE DEVAM ET</button>
+ </div>
+</section>
+<section class="screen" id="pair">
+ <div class="card"><div class="brand"><span class="mark">&#9654;</span>KUKİ <span>PLAYER</span></div>
+  <h1>CİHAZINIZ HAZIR</h1>
+  <p>6 haneli kodu <strong>www.kukiplayer.net</strong> yönetim panelindeki cihaz eşleştirme bölümüne girin.</p>
+  <div id="pair-code">------</div><p class="info" id="pair-status">Cihaz bilgileri kontrol ediliyor...</p>
+  <button class="action nav" type="button" id="pair-retry">TEKRAR YÜKLE</button>
+  <button class="action nav" type="button" id="pair-demo">MENÜ ÖN İZLEME</button>
+  <p style="font-size:13px">KUKİ PLAYER IPTV satışı yapmaz. Yalnızca TV oynatıcısıdır.</p>
+ </div>
+</section>
+<section class="screen" id="home">
+ <header><div class="brand"><span class="mark">&#9654;</span>KUKİ <span>PLAYER</span></div><span id="clock">--:--</span></header>
+ <div class="hero"><div class="hero-watermark">KUKİ PLAYER</div>
+  <div class="hero-card"><span class="pill">KUKİ PLAYER</span><h1 id="hero-head">MEDYA OYNATICI</h1><p id="hero-desc">Televizyonunuza özel medya deneyimi</p></div>
+ </div>
+ <div class="tiles">
+  <button class="tile nav" type="button" data-go="live">CANLI TV</button>
+  <button class="tile nav" type="button" data-go="movies">FİLMLER</button>
+  <button class="tile nav" type="button" data-go="series">DİZİLER</button>
+  <button class="tile nav" type="button" data-go="settings">AYARLAR</button>
+ </div>
+ <div class="bottom">KUKİ PLAYER • Vestel / Foxxum • V4.0 <span class="right">KUMANDA: Yön Tuşları • OK • GERİ</span></div>
+</section>
+<section class="screen" id="live">
+ <div class="topbar"><button class="back nav" data-go="home">← Menü</button><h1>Canlı TV</h1><span class="top-note" id="live-total">Kanallar</span></div>
+ <div class="cols">
+  <div class="box cats"><div class="box-head">Kategoriler</div><div class="list" id="live-cats"><div class="empty">Liste hazırlanıyor...</div></div></div>
+  <div class="box items"><div class="box-head">Kanallar</div><input class="search nav" type="text" id="live-search" placeholder="Kanallarda ara..."><div class="list" id="live-list"><div class="empty">Yükleniyor...</div></div></div>
+  <div class="box preview">
+   <div class="player-box"><span class="live-chip">LIVE</span><video id="live-video" preload="none" playsinline></video><div class="video-cover" id="live-cover">Kanal seçilmedi<br>Video alanı hazır</div></div>
+   <div class="meta"><h2 id="live-name">Kanal Seçilmedi</h2><strong>ŞU AN OYNATILAN PROGRAM</strong><p id="epg-now">Program bilgisi yok</p><strong>SONRAKİ PROGRAM</strong><p id="epg-next">---</p></div>
+  </div>
+ </div>
+ <div class="bottom">OK: Kanalı oynat • Kırmızı: Favori • GERİ: Menü <span class="right">Yayın sunucusu HTTPS ve CORS izni gerektirebilir</span></div>
+</section>
+<section class="screen" id="movies">
+ <div class="topbar"><button class="back nav" data-go="home">← Menü</button><h1>Filmler</h1><span class="top-note" id="movies-total">Film kataloğu</span></div>
+ <div class="cols"><div class="box gridcats"><div class="box-head">Kategoriler</div><div class="list" id="movies-cats"><div class="empty">Liste hazırlanıyor...</div></div></div>
+  <div class="box gridbox"><div class="box-head">Filmler</div><input class="search nav" id="movies-search" type="text" placeholder="Tüm filmlerde ara..."><div class="gridlist" id="movies-list"></div></div></div>
+ <div class="bottom">OK: Film ayrıntısı • Kırmızı: Favori • GERİ: Menü</div>
+</section>
+<section class="screen" id="series">
+ <div class="topbar"><button class="back nav" data-go="home">← Menü</button><h1>Diziler</h1><span class="top-note" id="series-total">Dizi kataloğu</span></div>
+ <div class="cols"><div class="box gridcats"><div class="box-head">Kategoriler</div><div class="list" id="series-cats"><div class="empty">Liste hazırlanıyor...</div></div></div>
+  <div class="box gridbox"><div class="box-head">Diziler</div><input class="search nav" id="series-search" type="text" placeholder="Tüm dizilerde ara..."><div class="gridlist" id="series-list"></div></div></div>
+ <div class="bottom">OK: Dizi ayrıntısı • Kırmızı: Favori • GERİ: Menü</div>
+</section>
+<section class="screen" id="detail">
+ <div class="topbar"><button class="back nav" id="detail-back">← Geri</button><h1 id="detail-heading">İçerik Ayrıntıları</h1></div>
+ <div class="detail-layout"><img id="detail-poster" alt="İçerik posteri"><div id="detail-body">
+  <h2 id="detail-title">Seçilen İçerik</h2><p id="detail-info"></p><p id="detail-desc"></p>
+  <button class="action nav" type="button" id="detail-play">▶ HEMEN BAŞLAT</button>
+  <button class="action nav" type="button" id="detail-fav">♥ FAVORİ</button>
+  <div id="detail-episodes"></div>
+ </div></div>
+</section>
+<section class="screen" id="play-screen">
+ <video id="movie-video" preload="none" playsinline></video>
+ <div id="play-hint">KUKİ PLAYER • Video yükleniyor...</div>
+ <div id="play-transport"><button class="action nav" id="play-toggle">DURAKLAT / OYNAT</button><button class="action nav" id="play-stop">GERİ</button><span id="play-time">00:00</span></div>
+</section>
+<section class="screen" id="settings">
+ <div class="topbar"><button class="back nav" data-go="home">← Menü</button><h1>Ayarlar</h1></div>
+ <div class="setting-grid">
+  <button type="button" class="setting nav" id="setting-pin">Ebeveyn Kontrolü <small id="parent-label">Açık</small></button>
+  <button type="button" class="setting nav" id="setting-lang">Uygulama Dili <small>Türkçe</small></button>
+  <button type="button" class="setting nav" id="setting-player">Oynatıcı Motoru <small>HTML5 / HLS</small></button>
+  <button type="button" class="setting nav" id="setting-sub">Altyazı <small>Otomatik</small></button>
+  <button type="button" class="setting nav" id="setting-refresh">Listeyi Yenile <small>Yeniden Getir</small></button>
+  <button type="button" class="setting nav" id="setting-exit">Hesaptan Çıkış <small>Yeni Eşleştirme</small></button>
+ </div>
+ <p id="settings-tip">Vestel MB230 oynatıcı özellikleri cihazın HTML5 desteğiyle sınırlıdır.</p>
+</section>
+<div id="toast" role="status"></div>
+<script src="./vestel-v4.js"></script>
+</body></html>
