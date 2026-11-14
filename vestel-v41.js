@@ -7,7 +7,8 @@ var screen='legal', device=null, authorized=false, busy=false, playerHls=null, p
 var server='',username='',password='', dataLoaded=false, loading=false, overlayTimer=null;
 var lists={live:[],movies:[],series:[]},cats={live:[],movies:[],series:[]};
 var choice={live:'all',movies:'all',series:'all'}, lastType='movies',selected=null,episode=null;
-var favorites={},cache={},liveFullscreen=false; 
+var favorites={},cache={},liveFullscreen=false;
+var heroMovies=[],heroIndex=0,heroTimer=null; 
 function el(id){return document.getElementById(id);}
 function say(id,s){if(el(id))el(id).textContent=String(s||'');}
 function save(k,v){try{window.localStorage.setItem(k,v);return true;}catch(e){return false;}}
@@ -127,7 +128,7 @@ function fetchCatalog(){
   cats.live=Array.isArray(values[0])?values[0]:[];lists.live=Array.isArray(values[1])?values[1]:[];
   cats.movies=Array.isArray(values[2])?values[2]:[];lists.movies=Array.isArray(values[3])?values[3]:[];
   cats.series=Array.isArray(values[4])?values[4]:[];lists.series=Array.isArray(values[5])?values[5]:[];
-  drawAll();updateHero();
+  drawAll();initHeroSlider();updateHero();
   if(failed)toast('Bazı listeler getirilemedi ('+failed+'/6). Sunucu HTTPS/CORS veya hesap bilgilerini kontrol edin.');
   else toast('İçerikler hazır: '+lists.live.length+' kanal, '+lists.movies.length+' film, '+lists.series.length+' dizi.');
  }
@@ -180,7 +181,70 @@ function drawType(type){
  if(all.length>max){var more=document.createElement('div');more.className='empty';more.textContent='İlk '+max+' içerik gösteriliyor. Arama veya kategori kullanabilirsiniz.';root.appendChild(more);}
 }
 function drawAll(){var ts=['live','movies','series'];for(var i=0;i<ts.length;i++){drawCats(ts[i]);drawType(ts[i]);}}
-function updateHero(){say('hero-head','MEDYA OYNATICI');say('hero-desc',authorized?lists.live.length+' canlı kanal · '+lists.movies.length+' film · '+lists.series.length+' dizi':'Samsung ve LG ile aynı menü düzeni · Ön izleme modu');}
+function movieBannerCategoryName(name){
+ // Turkish dotted I is sometimes lowercased as i + combining dot.
+ return String(name||'').toLowerCase().replace(/\u0307/g,'').replace(/ı/g,'i');
+}
+function isRestrictedBannerTitle(name){
+ return /(^|[\s\-])(adult|erotik|porno|porn|xxx|18\+|18 yaş|yetişkin)([\s\-]|$)/i.test(movieBannerCategoryName(name));
+}
+function initHeroSlider(){
+ if(heroTimer){clearInterval(heroTimer);heroTimer=null;}
+ heroMovies=[];heroIndex=0;
+ var categoryId='',i,c,list=lists.movies||[],categories=cats.movies||[],movie,art;
+ for(i=0;i<categories.length;i++){
+  c=categories[i];
+  if(movieBannerCategoryName(c.category_name).indexOf('vizyon')!==-1&&!isRestrictedBannerTitle(c.category_name)){
+   categoryId=String(c.category_id);break;
+  }
+ }
+ if(categoryId){
+  for(i=0;i<list.length;i++){
+   movie=list[i];
+   art=safeImage(movie.stream_icon||movie.cover);
+   if(String(movie.category_id)===categoryId&&art&&!isRestrictedBannerTitle(titleOf(movie))){
+    heroMovies.push(movie);
+    if(heroMovies.length===5)break;
+   }
+  }
+ }
+ if(heroMovies.length>1){
+  heroTimer=setInterval(function(){
+   if(screen!=='home')return; // Avoid poster rendering during video playback or menu browsing.
+   heroIndex=(heroIndex+1)%heroMovies.length;
+   showHeroSlide();
+  },10000);
+ }
+ showHeroSlide();
+}
+function showHeroSlide(){
+ var banner=el('hero-art'),frame=el('hero-art-frame'),hero=el('home').querySelector('.hero'),dots=el('hero-dots'),i,node,m,url;
+ if(!heroMovies.length){
+  hero.className='hero';
+  frame.style.display='none';banner.removeAttribute('src');dots.innerHTML='';
+  say('hero-head','MEDYA OYNATICI');say('hero-badge','KUKİ PLAYER');say('hero-rating','');
+  el('hero-rating').style.display='none';return;
+ }
+ m=heroMovies[heroIndex];url=safeImage(m.stream_icon||m.cover);
+ hero.className='hero has-posters';
+ frame.style.display='block';
+ banner.alt=titleOf(m)+' film afişi';
+ banner.style.visibility='hidden';
+ banner.onload=function(){this.style.visibility='visible';};
+ banner.onerror=function(){this.style.visibility='hidden';};
+ banner.src=url;
+ say('hero-badge','VİZYONDAKİ FİLMLER');
+ say('hero-head',titleOf(m));
+ var rate=String(m.rating||m.rating_5based||'');
+ say('hero-rating',rate?'★ '+rate:'');
+ el('hero-rating').style.display=rate?'block':'none';
+ dots.innerHTML='';
+ for(i=0;i<heroMovies.length;i++){node=document.createElement('span');node.className='hero-dot'+(i===heroIndex?' on':'');dots.appendChild(node);}
+}
+function updateHero(){
+ say('hero-desc',authorized?lists.live.length+' canlı kanal · '+lists.movies.length+' film · '+lists.series.length+' dizi':'Samsung ve LG ile aynı menü düzeni · Ön izleme modu');
+ if(screen==='home'||screen==='pair')showHeroSlide();
+}
 function openDetail(type,x){
  lastType=type;selected=x;episode=null;
  say('detail-heading',type==='movies'?'Film Ayrıntıları':'Dizi Ayrıntıları');
