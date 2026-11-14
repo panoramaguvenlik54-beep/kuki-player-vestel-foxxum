@@ -124,6 +124,28 @@
  <p id="settings-tip">Vestel MB230 oynatıcı özellikleri cihazın HTML5 desteğiyle sınırlıdır.</p>
 </section>
 
+<div id="pin-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pin-heading">
+ <div id="pin-card">
+  <h2 id="pin-heading">EBEVEYN KONTROLÜ</h2>
+  <p id="pin-description">Bu klasör için 4 haneli PIN girin.</p>
+  <div id="pin-indicators" aria-live="polite">○ ○ ○ ○</div>
+  <div class="pin-keypad">
+   <button class="pin-key nav" type="button" data-pin-digit="1">1</button>
+   <button class="pin-key nav" type="button" data-pin-digit="2">2</button>
+   <button class="pin-key nav" type="button" data-pin-digit="3">3</button>
+   <button class="pin-key nav" type="button" data-pin-digit="4">4</button>
+   <button class="pin-key nav" type="button" data-pin-digit="5">5</button>
+   <button class="pin-key nav" type="button" data-pin-digit="6">6</button>
+   <button class="pin-key nav" type="button" data-pin-digit="7">7</button>
+   <button class="pin-key nav" type="button" data-pin-digit="8">8</button>
+   <button class="pin-key nav" type="button" data-pin-digit="9">9</button>
+   <button class="pin-key nav" type="button" data-pin-digit="0">0</button>
+   <button class="pin-key nav" id="pin-delete" type="button">SİL</button>
+   <button class="pin-key nav" id="pin-cancel" type="button">İPTAL</button>
+  </div>
+  <p id="pin-feedback" aria-live="polite">PIN: 0000 (varsayılan)</p>
+ </div>
+</div>
 <div id="exit-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="exit-heading">
  <div id="exit-card">
   <div class="brand"><span class="mark">&#9654;</span>KUKİ <span>PLAYER</span></div>
