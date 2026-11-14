@@ -42,39 +42,68 @@
   function poll() {
     if (!tick) tick = window.setInterval(function () { if (opened && device && !busy && lastState !== 'EŞLEŞTİRME BAŞARILI') check(); }, 30000);
   }
+  // OMI 4.13 can emit readyState=4 before exposing the final response body.
+  // Prefer onload and defer readyState parsing; never print device tokens.
   function http(action, fields, cb) {
-    var xhr;
     if (busy || !opened) return;
     busy = true;
+    var xhr;
+    var completed = false;
+    var timeoutHandle = null;
+    function finish(error, data) {
+      if (completed) return;
+      completed = true;
+      if (timeoutHandle) window.clearTimeout(timeoutHandle);
+      busy = false;
+      if (opened) cb(error, data || {});
+    }
+    function parseResponse() {
+      if (completed) return;
+      var status = 0, raw = '', data = null;
+      try { status = xhr.status || 0; } catch (e) {}
+      try { raw = xhr.responseText || ''; }
+      catch (readError) {
+        finish('TV sunucu yanıtını okuyamıyor (HTTP ' + status + '). Tarayıcı erişim izni sorunu olabilir.');
+        return;
+      }
+      raw = String(raw).replace(/^\\uFEFF/, '').replace(/^\\s+|\\s+$/g, '');
+      if (!raw) {
+        finish('Sunucu yanıtı TV üzerinde boş görünüyor (HTTP ' + status + ').');
+        return;
+      }
+      try { data = JSON.parse(raw); }
+      catch (parseError) {
+        finish('Sunucu HTTP ' + status + ' ile yanıtladı; TV JSON verisini çözemedi (' + raw.length + ' karakter).');
+        return;
+      }
+      if (status < 200 || status >= 300 || !data || data.success !== true) {
+        finish(data && data.message ? data.message : ('API hatası: HTTP ' + status));
+        return;
+      }
+      finish(null, data);
+    }
     try {
       xhr = new XMLHttpRequest();
       xhr.open('POST', ENDPOINT, true);
-      xhr.timeout = 15000;
+      try { xhr.timeout = 18000; } catch (e) {}
       xhr.setRequestHeader('Content-Type', 'application/json');
-      var done = false;
-      function finish(error, data) {
-        if (done) return;
-        done = true;
-        busy = false;
-        if (opened) cb(error, data || {});
-      }
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.onload = parseResponse;
       xhr.onreadystatechange = function () {
-        if (xhr.readyState !== 4) return;
-        var data;
-        try { data = JSON.parse(xhr.responseText || '{}'); }
-        catch (e) { return finish('Sunucudan okunabilir yanıt gelmedi.'); }
-        if (xhr.status < 200 || xhr.status >= 300 || data.success !== true) {
-          return finish(data.message || ('Sunucu hatası (HTTP ' + xhr.status + ').'));
-        }
-        finish(null, data);
+        if (xhr.readyState === 4) window.setTimeout(parseResponse, 150);
       };
-      xhr.onerror = function () { finish('Sunucu bağlantısı kurulamadı. Vestel GitHub Pages adresine API izni (CORS) verilmesi gerekiyor olabilir.'); };
-      xhr.ontimeout = function () { finish('Sunucu yanıt vermedi. Ağ bağlantısını kontrol edin.'); };
-      var payload = { action: action, platform: 'vestel_foxxum', app_version: 'foxxum-v2-test' };
+      xhr.onerror = function () { finish('TV sunucu yanıtını alamadı. Bağlantı veya tarayıcı erişim izni sorunu (CORS).'); };
+      xhr.ontimeout = function () { finish('Sunucu yanıtı TV’ye ulaşmadı (zaman aşımı).'); };
+      timeoutHandle = window.setTimeout(function () {
+        if (completed) return;
+        try { xhr.abort(); } catch (e) {}
+        finish('18 saniyede yanıt tamamlanamadı. TV ağ bağlantısını kontrol edin.');
+      }, 19000);
+      var payload = {action: action, platform: 'vestel_foxxum', app_version: 'foxxum-v2.1-test'};
       var k;
-      for (k in fields) if (Object.prototype.hasOwnProperty.call(fields,k)) payload[k] = fields[k];
+      for (k in fields) if (Object.prototype.hasOwnProperty.call(fields, k)) payload[k] = fields[k];
       xhr.send(JSON.stringify(payload));
-    } catch (e) { busy = false; cb('Tarayıcı bağlantısı başlatılamadı.', {}); }
+    } catch (e) { finish('Eski TV tarayıcısı ağ isteğini başlatamadı.', {}); }
   }
   function check() {
     if (!device || busy) return;
