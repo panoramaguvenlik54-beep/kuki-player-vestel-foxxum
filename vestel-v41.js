@@ -260,6 +260,13 @@ function startVOD(type,x){
  startSource(el('movie-video'),url,titleOf(x),false,'');
 }
 function refresh(){if(!authorized){toast('Önce cihaz etkinleştirilmelidir.');return;}fetchCatalog();}
+function updateApplication(){
+ // Reload at the same saved Web App Tester path with a different query string,
+ // avoiding obsolete HTML/CSS/JS caches on Vestel OMI without changing devices.
+ var url=window.location.pathname+'?update='+new Date().getTime();
+ toast('KUKİ PLAYER yeni sürüm kontrol ediliyor...');
+ window.location.replace(url);
+}
 function logout(){
  if(!device||busy)return;
  var yes=window.confirm('Bu cihazın hesabını kaldırıp yeni eşleştirme kodu oluşturulsun mu?');
@@ -316,6 +323,7 @@ function installHandlers(){
  el('play-stop').onclick=function(){switchTo('detail');};
  el('play-toggle').onclick=function(){var v=el('movie-video');try{if(v.paused)v.play();else v.pause();}catch(e){}};
  el('setting-refresh').onclick=refresh;
+ el('setting-app-update').onclick=updateApplication;
  el('setting-exit').onclick=logout;
  el('setting-pin').onclick=function(){var current=read('kuki_vestel_parental_v1')!=='off';save('kuki_vestel_parental_v1',current?'off':'on');say('parent-label',current?'Kapalı':'Açık');toast('Ebeveyn kilidi ayarı kaydedildi. PIN koruması Vestel sürümünde henüz uygulanmadı.');};
  el('setting-lang').onclick=function(){toast('KUKİ PLAYER arayüz dili: Türkçe');};
