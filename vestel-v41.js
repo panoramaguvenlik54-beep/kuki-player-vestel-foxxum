@@ -9,6 +9,7 @@ var lists={live:[],movies:[],series:[]},cats={live:[],movies:[],series:[]};
 var choice={live:'all',movies:'all',series:'all'}, lastType='movies',selected=null,episode=null;
 var favorites={},cache={},liveFullscreen=false;
 var exitDialogOpen=false,exitBeforeFocus=null,exitBusy=false;
+var remoteBackAt=0,remoteBackGuard=false;
 var heroMovies=[],heroIndex=0,heroTimer=null; 
 function el(id){return document.getElementById(id);}
 function say(id,s){if(el(id))el(id).textContent=String(s||'');}
@@ -444,16 +445,86 @@ function confirmExit(){
   if(!exitDialogOpen)return;
   if(document.visibilityState==='hidden')return;
   try{
-   if(window.history&&window.history.length>1){window.history.back();return;}
+   if(window.history&&window.history.length>1){
+    if(remoteBackGuard&&window.history.length>2)window.history.go(-2);
+    else window.history.back();
+    return;
+   }
   }catch(e){}
   say('exit-feedback','Otomatik çıkış TV tarafından engellendi. Kumandanın EXIT veya HOME tuşuyla çıkabilirsiniz.');
   exitBusy=false;
  },650);
 }
 
+
+/* Legacy REGAL/Foxxum remote Back is sometimes a browser-history operation.
+   Capture both keydown AND keypress, and protect the one-page TV app with a
+   single same-URL history entry when this browser supports pushState. */
+function isRemoteBack(e){
+ if(!e)return false;
+ var k=e.keyCode||e.which||0, n=String(e.key||'').toLowerCase(), vk=null;
+ try{if(typeof window.VK_BACK==='number')vk=window.VK_BACK;}catch(err){}
+ return k===8||k===27||k===461||k===10009||k===166||k===vk||
+   n==='back'||n==='backspace'||n==='browserback'||n==='goback'||n==='escape';
+}
+function consumeRemoteEvent(e){
+ if(!e)return;
+ try{if(e.preventDefault)e.preventDefault();}catch(err){}
+ try{if(e.stopPropagation)e.stopPropagation();}catch(err){}
+ try{if(e.stopImmediatePropagation)e.stopImmediatePropagation();}catch(err){}
+ try{e.returnValue=false;e.cancelBubble=true;}catch(err){}
+}
+function appBack(){
+ if(exitDialogOpen){dismissExitDialog();return;}
+ if(liveFullscreen){exitLiveFullscreen();return;}
+ if(screen==='play-screen'){switchTo('detail');return;}
+ if(screen==='detail'){switchTo(lastType);return;}
+ if(screen==='live'||screen==='movies'||screen==='series'||screen==='settings'){
+  switchTo('home');return;
+ }
+ if(screen==='home'){showExitDialog();}
+}
+function receiveRemoteBack(e){
+ if(!isRemoteBack(e))return;
+ consumeRemoteEvent(e);
+ if(e.type==='keyup')return false;
+ var now=new Date().getTime();
+ if(now-remoteBackAt>380){
+  remoteBackAt=now;
+  appBack();
+ }
+ return false;
+}
+function guardBrowserHistory(){
+ try{
+  if(!window.history||typeof window.history.pushState!=='function')return;
+  var state=window.history.state;
+  var sameUrl=window.location.pathname+window.location.search+window.location.hash;
+  if(state&&state.kukiBackGuard==='yes'){
+   window.history.replaceState({kukiBackGuard:'yes'},'',sameUrl);
+  }else{
+   window.history.pushState({kukiBackGuard:'yes'},'',sameUrl);
+  }
+  remoteBackGuard=true;
+ }catch(err){remoteBackGuard=false;}
+}
+function browserBackEvent(){
+ // A confirmed Yes may deliberately exit via the TV/browser history.
+ if(exitBusy&&exitDialogOpen)return;
+ var now=new Date().getTime();
+ // Some TVs dispatch both a key event and the native history operation
+ // for one press. Never navigate twice for the same physical button.
+ if(now-remoteBackAt>700){
+  remoteBackAt=now;
+  appBack();
+ }
+ guardBrowserHistory();
+}
+
 function onKey(e){
  e=e||window.event;
  var key=e.keyCode||e.which;
+ if(isRemoteBack(e)){return receiveRemoteBack(e);}
  if(exitDialogOpen){
   if(key===8||key===27||key===461||key===10009||key===166){
    dismissExitDialog();
@@ -493,7 +564,7 @@ function onKey(e){
   }
   if(key===13||key===37||key===39){if(e.preventDefault)e.preventDefault();return false;}
  }
- if(key===8||key===27||key===461||key===10009||key===166){if(screen==='play-screen')switchTo('detail');else if(screen==='detail')switchTo(lastType);else if(screen!=='home'&&screen!=='pair')switchTo('home');else if(screen==='home'){showExitDialog();}if(e.preventDefault)e.preventDefault();return false;}
+ /* Back navigation is handled before screen-specific keys and in capture phase. */
  if(screen==='play-screen'&&(key===415||key===19||key===13)){el('play-toggle').click();if(e.preventDefault)e.preventDefault();return false;}
  if((key===37||key===38||key===39||key===40)&&screen!=='play-screen'){
   if(document.activeElement&&document.activeElement.tagName==='INPUT'&&key===37)return;
@@ -528,6 +599,14 @@ function installHandlers(){
  el('setting-player').onclick=function(){toast('Vestel oynatıcı: HTML5 video / desteklenirse HLS.js.');};
  el('setting-sub').onclick=function(){toast('Altyazı seçimi, desteklenen medya akışında TV tarayıcısı üzerinden yapılır.');};
  document.onkeydown=onKey;
+ if(window.addEventListener){
+  window.addEventListener('keydown',receiveRemoteBack,true);
+  window.addEventListener('keypress',receiveRemoteBack,true);
+  window.addEventListener('keyup',receiveRemoteBack,true);
+  window.addEventListener('popstate',browserBackEvent,false);
+ }
+ document.onkeypress=function(e){if(isRemoteBack(e))return receiveRemoteBack(e);};
+ guardBrowserHistory();
  el('movie-video').ontimeupdate=function(){var n=Number(this.currentTime)||0,d=Number(this.duration)||0;say('play-time',Math.floor(n/60)+':'+(n%60<10?'0':'')+Math.floor(n%60)+(d?' / '+Math.floor(d/60)+':'+(d%60<10?'0':'')+Math.floor(d%60):''));};
  setInterval(function(){if(screen==='home')tickClock();},60000);
 }
