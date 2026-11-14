@@ -162,3 +162,38 @@ header{height:70px;padding:13px 40px;display:-webkit-box;display:flex;-webkit-bo
  #play-transport{bottom:1%;padding:8px}
  .play-control{padding:4px 10px}
 }
+
+/* REGAL screen fix: the old #detail-episodes max-height:40% clipped
+   the second row and left the bottom half unused. */
+#detail.series-mode .detail-layout{height:29%;margin:10px 3% 0}
+#detail-series-browser{height:52%;bottom:2%;padding:10px 13px}
+#detail-series-browser #detail-season-tabs{height:60px}
+#detail-series-browser #detail-episodes{
+ height:calc(100% - 60px);max-height:none!important;min-height:0;
+ overflow-y:auto;overflow-x:hidden;padding:8px 1px 12px;
+}
+#detail-series-browser .episode-choice{
+ width:31.6%;margin:4px .8%;min-height:60px;vertical-align:top;
+ white-space:normal;line-height:1.25;overflow-wrap:break-word;
+}
+@media(max-height:600px){
+ #detail.series-mode .detail-layout{height:27%}
+ #detail-series-browser{height:50%;bottom:2%}
+ #detail-series-browser #detail-episodes{max-height:none!important}
+ #detail-series-browser .episode-choice{min-height:47px}
+}
+/* Remote-first PIN keypad: never rely on a TV's virtual keyboard. */
+#pin-dialog{position:fixed;inset:0;top:0;left:0;right:0;bottom:0;z-index:120;
+ display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;
+ -webkit-box-pack:center;justify-content:center;background:rgba(3,0,8,.94)}
+#pin-card{width:440px;max-width:92%;padding:20px 25px;text-align:center;
+ border:2px solid #ad58c9;border-radius:17px;background:#271036;
+ box-shadow:0 0 50px rgba(169,73,203,.35)}
+#pin-heading{font-size:24px;margin:4px 0 13px}
+#pin-description{font-size:15px;color:#ecd3f5;line-height:1.4}
+#pin-indicators{font-size:33px;letter-spacing:9px;margin:12px 0 17px;color:#ffe1fe}
+.pin-keypad{display:-webkit-box;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.pin-key{width:31%;margin:1%;height:57px;padding:7px 3px;color:#fff;font-size:24px;
+ font-weight:bold;border:2px solid #9051b0;border-radius:10px;background:#441b5f}
+#pin-delete,#pin-cancel{font-size:17px}
+#pin-feedback{font-size:14px;min-height:23px;color:#ffdbf7}
