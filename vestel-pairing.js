@@ -66,7 +66,7 @@
         finish('TV sunucu yanıtını okuyamıyor (HTTP ' + status + '). Tarayıcı erişim izni sorunu olabilir.');
         return;
       }
-      raw = String(raw).replace(/^\\uFEFF/, '').replace(/^\\s+|\\s+$/g, '');
+      raw = String(raw).replace(/^\uFEFF/, '').replace(/^\s+|\s+$/g, '');
       if (!raw) {
         finish('Sunucu yanıtı TV üzerinde boş görünüyor (HTTP ' + status + ').');
         return;
