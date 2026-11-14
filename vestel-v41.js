@@ -11,7 +11,9 @@ var favorites={},cache={},liveFullscreen=false;
 var exitDialogOpen=false,exitBeforeFocus=null,exitBusy=false;
 var remoteBackAt=0,remoteBackGuard=false;
 var heroMovies=[],heroIndex=0,heroTimer=null;
-var playerHideTimer=null,trackPanelOpen=false,seriesEpisodes=null,chosenSeason=''; 
+var playerHideTimer=null,trackPanelOpen=false,seriesEpisodes=null,chosenSeason='';
+var pinDialogOpen=false,pinValue='',pinSuccess=null,pinPreviousFocus=null;
+var adultUnlocked={live:'',movies:'',series:''},vodScrubActive=false,vodScrubTime=0; 
 function el(id){return document.getElementById(id);}
 function say(id,s){if(el(id))el(id).textContent=String(s||'');}
 function save(k,v){try{window.localStorage.setItem(k,v);return true;}catch(e){return false;}}
@@ -74,7 +76,7 @@ function switchTo(id){
  var all=document.querySelectorAll('.screen'),i;
  for(i=0;i<all.length;i++)all[i].className=all[i].className.replace(/\s*active\b/g,'');
  el(id).className+=' active';screen=id;
- if(id==='home'){tickClock();if(dataLoaded)updateHero();}
+ if(id==='home'){resetAdultView();tickClock();if(dataLoaded)updateHero();}
  // The REGAL browser may perform a native Back outside the JS key handler.
  // Keep a same-origin same-document history stop for each page transition.
  if(changed&&id!=='legal')guardBrowserHistory();
@@ -181,15 +183,117 @@ function toggleFav(type,x){var f=getFav(type),id=itemID(type,x),i=f.indexOf(id);
 function safeImage(src){var s=String(src||'');return /^https?:\/\//i.test(s)?s:'';}
 function emptyList(node,msg){node.innerHTML='';var d=document.createElement('div');d.className='empty';d.textContent=msg;node.appendChild(d);}
 function makeButton(label,cls,onClick){var b=document.createElement('button');b.type='button';b.className=cls+' nav';b.textContent=label;b.onclick=onClick;return b;}
+
+/* Protected folders stay hidden in TUMU/search/favorites until the PIN is
+   entered for the chosen folder. Lock is ON by default. */
+function parentActive(){return read('kuki_vestel_parental_v1')!=='off';}
+function isAdultCategoryName(name){
+ var s=String(name||'').toLowerCase().replace(/\u0307/g,'').replace(/ı/g,'i');
+ return /(?:xxx|porn|erotik|erotic|adult|yetişkin|yetiskin|cinsel|18\s*(?:\+|yaş|yas|plus)|\+\s*18)/i.test(s);
+}
+function adultCategory(type,id){
+ var list=cats[type]||[],i;
+ for(i=0;i<list.length;i++){
+  if(catID(list[i])===String(id)&&isAdultCategoryName(list[i].category_name))return list[i];
+ }
+ return null;
+}
+function adultItem(type,item){
+ return !!(item&&adultCategory(type,item.category_id==null?'':item.category_id));
+}
+function adultAuthorized(type,item){
+ if(!parentActive()||!adultItem(type,item))return true;
+ var id=String(item.category_id==null?'':item.category_id);
+ return choice[type]===id&&adultUnlocked[type]===id;
+}
+function pinIndicators(){
+ var s='',i;
+ for(i=0;i<4;i++)s+=(i?' ':'')+(i<pinValue.length?'●':'○');
+ say('pin-indicators',s);
+}
+function openPinPrompt(description,onSuccess){
+ pinValue='';pinSuccess=onSuccess;pinDialogOpen=true;
+ pinPreviousFocus=document.activeElement;
+ say('pin-description',description||'4 haneli ebeveyn PIN kodunu girin.');
+ say('pin-feedback','4 haneli PIN giriniz.');
+ pinIndicators();
+ el('pin-dialog').className='';
+ setTimeout(function(){
+  if(pinDialogOpen){
+   var zero=el('pin-dialog').querySelector('[data-pin-digit="0"]');
+   if(zero)try{zero.focus();}catch(e){}
+  }
+ },25);
+}
+function closePinPrompt(){
+ if(!pinDialogOpen)return;
+ pinDialogOpen=false;pinValue='';
+ pinSuccess=null;el('pin-dialog').className='hidden';
+ if(pinPreviousFocus&&pinPreviousFocus.focus)try{pinPreviousFocus.focus();}catch(e){}
+ pinPreviousFocus=null;
+}
+function inputPinDigit(digit){
+ if(!pinDialogOpen||!/^[0-9]$/.test(String(digit)))return;
+ pinValue+=String(digit);
+ pinIndicators();
+ if(pinValue.length!==4)return;
+ if(pinValue==='0000'){
+  var callback=pinSuccess;
+  closePinPrompt();
+  if(typeof callback==='function')callback();
+ }else{
+  pinValue='';
+  pinIndicators();
+  say('pin-feedback','Yanlış PIN. Tekrar deneyin.');
+ }
+}
+function deletePinDigit(){
+ if(!pinDialogOpen)return;
+ pinValue=pinValue.substring(0,Math.max(0,pinValue.length-1));
+ pinIndicators();
+ say('pin-feedback','4 haneli PIN giriniz.');
+}
+function movePinFocus(key){
+ var nodes=el('pin-dialog').querySelectorAll('button.pin-key'),i,idx=-1,n;
+ for(i=0;i<nodes.length;i++)if(nodes[i]===document.activeElement){idx=i;break;}
+ if(idx<0)idx=9;
+ var row=Math.floor(idx/3),col=idx%3;
+ if(key===37)col=Math.max(0,col-1);
+ if(key===39)col=Math.min(2,col+1);
+ if(key===38)row=Math.max(0,row-1);
+ if(key===40)row=Math.min(3,row+1);
+ n=nodes[row*3+col];
+ if(n)try{n.focus();}catch(e){}
+}
+function selectCategory(type,id){
+ id=String(id);
+ var adult=adultCategory(type,id);
+ if(adult&&parentActive()){
+  openPinPrompt('Yetişkin kategorisi: '+String(adult.category_name||'')+' — PIN girin.',function(){
+   adultUnlocked[type]=id;choice[type]=id;drawType(type);
+  });
+  return;
+ }
+ adultUnlocked[type]='';choice[type]=id;drawType(type);
+}
+function resetAdultView(){
+ var names=['live','movies','series'],i,t;
+ for(i=0;i<names.length;i++){
+  t=names[i];adultUnlocked[t]='';
+  if(parentActive()&&adultCategory(t,choice[t]))choice[t]='all';
+  if(dataLoaded)drawType(t);
+ }
+}
+
 function drawCats(type){
  var root=el(type+'-cats'),categories=cats[type],c,i;root.innerHTML='';
- c=makeButton('TÜMÜ ('+lists[type].length+')','rowitem',function(){choice[type]='all';drawType(type);});root.appendChild(c);
- c=makeButton('♥ FAVORİLER','rowitem',function(){choice[type]='fav';drawType(type);});root.appendChild(c);
- for(i=0;i<categories.length;i++){(function(cat){var b=makeButton(cat.category_name||'Kategori','rowitem',function(){choice[type]=catID(cat);drawType(type);});root.appendChild(b);})(categories[i]);}
+ c=makeButton('TÜMÜ ('+lists[type].length+')','rowitem',function(){selectCategory(type,'all');});root.appendChild(c);
+ c=makeButton('♥ FAVORİLER','rowitem',function(){selectCategory(type,'fav');});root.appendChild(c);
+ for(i=0;i<categories.length;i++){(function(cat){var b=makeButton(cat.category_name||'Kategori','rowitem',function(){selectCategory(type,catID(cat));});root.appendChild(b);})(categories[i]);}
 }
 function filtered(type){
  var all=lists[type],cat=choice[type],q=(el(type+'-search')||{value:''}).value.toLowerCase().replace(/^\s+|\s+$/g,''),out=[],i,x;
- for(i=0;i<all.length;i++){x=all[i];if(cat==='fav'&&!hasFav(type,x))continue;if(cat!=='fav'&&cat!=='all'&&String(x.category_id||'')!==cat)continue;if(q&&titleOf(x).toLowerCase().indexOf(q)<0)continue;out.push(x);}
+ for(i=0;i<all.length;i++){x=all[i];if(!adultAuthorized(type,x))continue;if(cat==='fav'&&!hasFav(type,x))continue;if(cat!=='fav'&&cat!=='all'&&String(x.category_id||'')!==cat)continue;if(q&&titleOf(x).toLowerCase().indexOf(q)<0)continue;out.push(x);}
  return out;
 }
 function drawType(type){
@@ -284,6 +388,7 @@ function updateHero(){
 }
 function showSeason(season){
  if(!seriesEpisodes)return;
+ var refocus=document.activeElement&&String(document.activeElement.className||'').indexOf('season-tab')>=0;
  chosenSeason=String(season);
  var keys=Object.keys(seriesEpisodes).sort(function(a,b){return Number(a)-Number(b);});
  var tabs=el('detail-season-tabs'),root=el('detail-episodes'),i,j,episodes,b;
@@ -305,8 +410,19 @@ function showSeason(season){
   })(episodes[j],j);
  }
  root.scrollTop=0;
+ if(refocus){
+  var btns=tabs.querySelectorAll('.season-tab');
+  for(i=0;i<btns.length;i++)if(btns[i].getAttribute('aria-pressed')==='true'){
+   try{btns[i].focus();}catch(e){}break;
+  }
+ }
 }
 function openDetail(type,x){
+ if(!adultAuthorized(type,x)){
+  openPinPrompt('Yetişkin içeriği — PIN girin.',function(){
+   adultUnlocked[type]=String(x.category_id);choice[type]=String(x.category_id);drawType(type);openDetail(type,x);
+  });return;
+ }
  lastType=type;selected=x;episode=null;seriesEpisodes=null;chosenSeason='';
  el('detail').className=el('detail').className.replace(/\s*series-mode\b/g,'');
  el('detail-series-browser').className=type==='series'?'':'hidden';
@@ -407,6 +523,11 @@ function changeFullscreenChannel(direction){
  startSource(el('live-video'),url,titleOf(target),true,alt!==url?alt:'');
 }
 function playLive(x){
+ if(!adultAuthorized('live',x)){
+  openPinPrompt('Yetişkin kanalı — PIN girin.',function(){
+   adultUnlocked.live=String(x.category_id);choice.live=String(x.category_id);drawType('live');playLive(x);
+  });return;
+ }
  // Second OK on the same channel expands the existing video without
  // calling stopVideo(), changing the source URL or seeking.
  if(currentLive&&itemID('live',currentLive)===itemID('live',x)){
@@ -428,6 +549,7 @@ function fmtVodTime(sec){
  return h?h+':'+p(m)+':'+p(s):p(m)+':'+p(s);
 }
 function updateVodProgress(){
+ if(vodScrubActive)return;
  var v=el('movie-video'),d=Number(v.duration),now=Number(v.currentTime)||0,r=el('play-progress');
  var seekable=isFinite(d)&&d>0;
  r.disabled=!seekable;r.value=seekable?Math.round(Math.max(0,Math.min(1,now/d))*1000):0;
@@ -443,7 +565,7 @@ function showVodControls(){
  el('play-transport').className='';
  if(playerHideTimer){clearTimeout(playerHideTimer);playerHideTimer=null;}
  updateVodPlayIcon();updateVodProgress();
- if(trackPanelOpen||el('movie-video').paused||el('movie-video').ended)return;
+ if(trackPanelOpen||vodScrubActive||el('movie-video').paused||el('movie-video').ended)return;
  playerHideTimer=setTimeout(function(){
   playerHideTimer=null;
   if(screen==='play-screen'&&!trackPanelOpen&&!el('movie-video').paused){
@@ -452,6 +574,7 @@ function showVodControls(){
  },4800);
 }
 function resetVodControls(){
+ vodScrubActive=false;vodScrubTime=0;
  if(playerHideTimer){clearTimeout(playerHideTimer);playerHideTimer=null;}
  trackPanelOpen=false;
  el('play-track-options').className='hidden';
@@ -465,11 +588,42 @@ function seekVod(delta){
  catch(e){toast('Bu yayında konum değiştirilemedi.');}
  showVodControls();
 }
-function selectVodPosition(){
- var v=el('movie-video'),d=Number(v.duration),pos=Number(el('play-progress').value)||0;
+/* Native range change events are not reliable on REGAL/OMI.  A TV remote
+   first selects a timestamp with LEFT/RIGHT, then OK commits the seek.
+   Never read the browser's unsolicited range value as the seek target. */
+function renderVodScrub(){
+ var d=Number(el('movie-video').duration),r=el('play-progress');
  if(!isFinite(d)||d<=0)return;
- try{v.currentTime=d*Math.min(1000,Math.max(0,pos))/1000;}catch(e){}
- showVodControls();
+ vodScrubTime=Math.max(0,Math.min(Math.max(0,d-1),vodScrubTime));
+ r.value=Math.round(1000*vodScrubTime/d);
+ say('play-time',fmtVodTime(vodScrubTime)+' / '+fmtVodTime(d)+' • OK: GİT');
+}
+function beginVodScrub(){
+ var v=el('movie-video'),d=Number(v.duration);
+ if(!isFinite(d)||d<=0){toast('Bu filmde zaman çubuğu kullanılamıyor.');return;}
+ vodScrubActive=true;vodScrubTime=Number(v.currentTime)||0;
+ showVodControls();renderVodScrub();
+}
+function shiftVodScrub(delta){
+ if(!vodScrubActive)beginVodScrub();
+ if(!vodScrubActive)return;
+ vodScrubTime+=delta;
+ renderVodScrub();showVodControls();
+}
+function finishVodScrub(commit){
+ if(!vodScrubActive)return;
+ var v=el('movie-video'),d=Number(v.duration),target=vodScrubTime;
+ vodScrubActive=false;
+ if(commit&&isFinite(d)&&d>0){
+  target=Math.max(0,Math.min(Math.max(0,d-1),target));
+  try{v.currentTime=target;}catch(e){toast('Bu filmde belirtilen dakikaya gidilemedi.');}
+ }
+ updateVodProgress();showVodControls();
+}
+function selectVodPosition(){
+ /* Native slider onchange may report the end of the film even when
+    the user only pressed a direction key. Never seek here. */
+ if(vodScrubActive)renderVodScrub();else updateVodProgress();
 }
 function toggleVodPause(){
  var v=el('movie-video');
@@ -662,6 +816,8 @@ function consumeRemoteEvent(e){
  try{e.returnValue=false;e.cancelBubble=true;}catch(err){}
 }
 function appBack(){
+ if(pinDialogOpen){closePinPrompt();return;}
+ if(screen==='play-screen'&&vodScrubActive){finishVodScrub(false);return;}
  if(exitDialogOpen){dismissExitDialog();return;}
  if(liveFullscreen){exitLiveFullscreen();return;}
  if(screen==='play-screen'){resetVodControls();switchTo('detail');return;}
@@ -709,6 +865,19 @@ function browserBackEvent(){
 function onKey(e){
  e=e||window.event;
  var key=e.keyCode||e.which;
+ if(pinDialogOpen){
+  if(isRemoteBack(e))return receiveRemoteBack(e);
+  var digit=-1;
+  if(key>=48&&key<=57)digit=key-48;
+  else if(key>=96&&key<=105)digit=key-96;
+  if(digit>=0)inputPinDigit(String(digit));
+  else if(key===37||key===38||key===39||key===40)movePinFocus(key);
+  else if(key===13){
+   var pinTarget=document.activeElement;
+   if(pinTarget&&pinTarget.click&&el('pin-dialog').contains(pinTarget))pinTarget.click();
+  }
+  consumeRemoteEvent(e);return false;
+ }
  if(isRemoteBack(e)){return receiveRemoteBack(e);}
  if(exitDialogOpen){
   if(key===8||key===27||key===461||key===10009||key===166){
@@ -752,16 +921,25 @@ function onKey(e){
  /* Back navigation is handled before screen-specific keys and in capture phase. */
  if(screen==='play-screen'){
   var hiddenControls=el('play-transport').className==='hidden';
+  var scrubFocused=document.activeElement===el('play-progress');
   if(key===415||key===19){toggleVodPause();}
   else if(key===412){seekVod(-10);}
   else if(key===417){seekVod(10);}
   else if((key===37||key===38||key===39||key===40)&&hiddenControls){
    showVodControls();try{el('play-toggle').focus();}catch(er){}
   }
-  else if((key===37||key===39)&&document.activeElement===el('play-progress'))seekVod(key===37?-10:10);
-  else if(key===37||key===38||key===39||key===40){showVodControls();directional(key);}
+  else if(scrubFocused&&(key===37||key===39)){
+   shiftVodScrub(key===37?-60:60);
+  }
+  else if(key===37||key===38||key===39||key===40){
+   if(vodScrubActive)finishVodScrub(false);
+   showVodControls();directional(key);
+  }
   else if(key===13){
    if(hiddenControls){showVodControls();try{el('play-toggle').focus();}catch(er){}}
+   else if(scrubFocused){
+    if(vodScrubActive)finishVodScrub(true);else beginVodScrub();
+   }
    else if(document.activeElement&&document.activeElement.tagName==='BUTTON'&&document.activeElement.click){
     document.activeElement.click();showVodControls();
    }else toggleVodPause();
@@ -802,10 +980,9 @@ function installHandlers(){
  el('play-audio').onclick=function(){chooseVodTrack('audio');};
  el('play-subtitle').onclick=function(){chooseVodTrack('subtitle');};
  el('play-progress').onchange=selectVodPosition;
- el('play-progress').oninput=function(){
-  var d=Number(el('movie-video').duration),k=Number(this.value)||0;
-  if(isFinite(d)&&d>0)say('play-time',fmtVodTime(d*k/1000)+' / '+fmtVodTime(d));
- };
+ el('play-progress').oninput=selectVodPosition;
+ el('play-progress').onfocus=showVodControls;
+ el('play-progress').onblur=function(){if(vodScrubActive)finishVodScrub(false);};
  el('play-screen').onmousemove=showVodControls;
  el('movie-video').onpause=function(){updateVodPlayIcon();showVodControls();};
  el('movie-video').onplay=function(){updateVodPlayIcon();showVodControls();};
@@ -815,8 +992,24 @@ function installHandlers(){
  if(el('setting-refresh').addEventListener){
   el('setting-refresh').addEventListener('click',refresh,false);
  }
+ var pinKeys=el('pin-dialog').querySelectorAll('[data-pin-digit]'),pinI;
+ for(pinI=0;pinI<pinKeys.length;pinI++){
+  pinKeys[pinI].onclick=function(){inputPinDigit(this.getAttribute('data-pin-digit'));};
+ }
+ el('pin-delete').onclick=deletePinDigit;
+ el('pin-cancel').onclick=closePinPrompt;
  el('setting-exit').onclick=logout;
- el('setting-pin').onclick=function(){var current=read('kuki_vestel_parental_v1')!=='off';save('kuki_vestel_parental_v1',current?'off':'on');say('parent-label',current?'Kapalı':'Açık');toast('Ebeveyn kilidi ayarı kaydedildi. PIN koruması Vestel sürümünde henüz uygulanmadı.');};
+ el('setting-pin').onclick=function(){
+  if(parentActive()){
+   openPinPrompt('Ebeveyn kontrolünü kapatmak için 4 haneli PIN girin.',function(){
+    save('kuki_vestel_parental_v1','off');say('parent-label','Kapalı');
+    resetAdultView();toast('Ebeveyn kontrolü kapatıldı.');
+   });
+  }else{
+   save('kuki_vestel_parental_v1','on');say('parent-label','Açık');
+   resetAdultView();toast('Ebeveyn kontrolü açıldı. PIN: 0000');
+  }
+ };
  el('setting-lang').onclick=function(){toast('KUKİ PLAYER arayüz dili: Türkçe');};
  el('setting-player').onclick=function(){toast('Vestel oynatıcı: HTML5 video / desteklenirse HLS.js.');};
  el('setting-sub').onclick=function(){toast('Altyazı seçimi, desteklenen medya akışında TV tarayıcısı üzerinden yapılır.');};
@@ -838,7 +1031,7 @@ function installHandlers(){
  setInterval(function(){if(screen==='home')tickClock();},60000);
 }
 function boot(){
- installHandlers();say('parent-label',read('kuki_vestel_parental_v1')==='off'?'Kapalı':'Açık');device=loadDevice();
+ installHandlers();say('parent-label',parentActive()?'Açık':'Kapalı');device=loadDevice();
  // An established paired device has already traversed legal acceptance.
  // Restore the marker without risking a repeated disclaimer.
  if(device&&validDevice(device))rememberLegal();
