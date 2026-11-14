@@ -10,7 +10,8 @@ var choice={live:'all',movies:'all',series:'all'}, lastType='movies',selected=nu
 var favorites={},cache={},liveFullscreen=false;
 var exitDialogOpen=false,exitBeforeFocus=null,exitBusy=false;
 var remoteBackAt=0,remoteBackGuard=false;
-var heroMovies=[],heroIndex=0,heroTimer=null; 
+var heroMovies=[],heroIndex=0,heroTimer=null;
+var playerHideTimer=null,trackPanelOpen=false,seriesEpisodes=null,chosenSeason=''; 
 function el(id){return document.getElementById(id);}
 function say(id,s){if(el(id))el(id).textContent=String(s||'');}
 function save(k,v){try{window.localStorage.setItem(k,v);return true;}catch(e){return false;}}
@@ -281,8 +282,34 @@ function updateHero(){
  say('hero-desc',authorized?lists.live.length+' canlı kanal · '+lists.movies.length+' film · '+lists.series.length+' dizi':'Samsung ve LG ile aynı menü düzeni · Ön izleme modu');
  if(screen==='home'||screen==='pair')showHeroSlide();
 }
+function showSeason(season){
+ if(!seriesEpisodes)return;
+ chosenSeason=String(season);
+ var keys=Object.keys(seriesEpisodes).sort(function(a,b){return Number(a)-Number(b);});
+ var tabs=el('detail-season-tabs'),root=el('detail-episodes'),i,j,episodes,b;
+ tabs.innerHTML='';root.innerHTML='';
+ for(i=0;i<keys.length;i++){
+  (function(key){
+   var tab=makeButton('SEZON '+key,'season-tab'+(key===chosenSeason?' active':''),function(){showSeason(key);});
+   tab.setAttribute('aria-pressed',key===chosenSeason?'true':'false');
+   tabs.appendChild(tab);
+  })(keys[i]);
+ }
+ episodes=seriesEpisodes[chosenSeason]||[];
+ if(!episodes.length){emptyList(root,'Bu sezonda bölüm bulunamadı.');return;}
+ for(j=0;j<episodes.length;j++){
+  (function(ep,number){
+   var label=ep.title||('Bölüm '+(ep.episode_num||number+1));
+   b=makeButton('▶ '+label,'episode-choice',function(){episode=ep;startVOD('series',ep);});
+   root.appendChild(b);
+  })(episodes[j],j);
+ }
+ root.scrollTop=0;
+}
 function openDetail(type,x){
- lastType=type;selected=x;episode=null;
+ lastType=type;selected=x;episode=null;seriesEpisodes=null;chosenSeason='';
+ el('detail').className=el('detail').className.replace(/\s*series-mode\b/g,'');
+ el('detail-series-browser').className=type==='series'?'':'hidden';
  say('detail-heading',type==='movies'?'Film Ayrıntıları':'Dizi Ayrıntıları');
  say('detail-title',titleOf(x));say('detail-desc',x.plot||x.description||'Açıklama bulunamadı.');
  say('detail-info',(x.releaseDate||x.release_date||x.year||'')+'  '+(x.rating?'★ '+x.rating:''));
@@ -290,27 +317,26 @@ function openDetail(type,x){
  if(src){el('detail-poster').src=src;el('detail-poster').style.display='block';}else el('detail-poster').style.display='none';
  say('detail-fav',hasFav(type,x)?'♥ FAVORİDEN ÇIKAR':'♥ FAVORİ');
  el('detail-play').style.display=type==='series'?'none':'inline-block';
+ el('detail-season-tabs').innerHTML='';
  emptyList(el('detail-episodes'),type==='series'?'Bölümler getiriliyor...':'');
  switchTo('detail');
+ if(type==='series')el('detail').className+=' series-mode';
  if(type==='movies')xtream('get_vod_info','&vod_id='+encodeURIComponent(x.stream_id),function(err,r){
-  if(screen!=='detail'||selected!==x||err)return;
+  if(screen!=='detail'||selected!==x||err||!r)return;
   var info=r.info||{};say('detail-desc',info.plot||x.plot||'Açıklama bulunamadı.');say('detail-info',(info.releaseDate||x.releaseDate||'')+'  '+(info.rating?'★ '+info.rating:''));
  });
  else xtream('get_series_info','&series_id='+encodeURIComponent(x.series_id),function(err,r){
   if(screen!=='detail'||selected!==x)return;
-  var root=el('detail-episodes');root.innerHTML='';
+  var root=el('detail-episodes');
   if(err||!r||!r.episodes){emptyList(root,'Bölüm bilgileri alınamadı.');return;}
-  var seasons=Object.keys(r.episodes),i,j,arr;
+  var seasons=Object.keys(r.episodes).sort(function(a,b){return Number(a)-Number(b);});
   if(r.info&&r.info.plot)say('detail-desc',r.info.plot);
-  for(i=0;i<seasons.length;i++){
-   var label=document.createElement('h3');label.textContent='Sezon '+seasons[i];root.appendChild(label);
-   arr=r.episodes[seasons[i]]||[];
-   for(j=0;j<arr.length;j++){(function(ep){
-    var b=makeButton('▶ '+(ep.title||('Bölüm '+ep.episode_num)),'rowitem',function(){episode=ep;startVOD('series',ep);});root.appendChild(b);
-   })(arr[j]);}
-  }
+  if(!seasons.length){emptyList(root,'Sezon bilgileri bulunamadı.');return;}
+  seriesEpisodes=r.episodes;
+  showSeason(seasons[0]);
  });
 }
+
 function sourceURL(type,x){
  if(!server||!username||!password)return '';
  var ext=type==='live'?'m3u8':(x.container_extension||'mp4'),id=type==='series'?x.id:x.stream_id,section=type==='live'?'live':type==='movies'?'movie':'series';
