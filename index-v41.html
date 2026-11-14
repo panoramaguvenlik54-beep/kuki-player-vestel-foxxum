@@ -4,7 +4,11 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>KUKİ PLAYER | Vestel 4.1</title>
-<link rel="stylesheet" href="./vestel-v41.css">
+<link rel="stylesheet" href="./vestel-v41.css" id="kuki-v41-css">
+<script>
+/* Fresh CSS even on older REGAL / OMI cached browsers. */
+(function(){var css=document.getElementById('kuki-v41-css');css.href='./vestel-v41.css?fresh='+new Date().getTime();})();
+</script>
 </head>
 <body>
 <section class="screen active" id="legal">
@@ -87,11 +91,15 @@
   <button type="button" class="setting nav" id="setting-lang">Uygulama Dili <small>Türkçe</small></button>
   <button type="button" class="setting nav" id="setting-player">Oynatıcı Motoru <small>HTML5 / HLS</small></button>
   <button type="button" class="setting nav" id="setting-sub">Altyazı <small>Otomatik</small></button>
-  <button type="button" class="setting nav" id="setting-refresh">Listeyi Yenile <small>Yeniden Getir</small></button>
+  <button type="button" class="setting nav" id="setting-refresh">Listeyi Yenile <small>İçerikleri Getir</small></button>
+  <button type="button" class="setting nav" id="setting-app-update">Uygulamayı Güncelle <small>Yeni Sürümü Yükle</small></button>
   <button type="button" class="setting nav" id="setting-exit">Hesaptan Çıkış <small>Yeni Eşleştirme</small></button>
  </div>
  <p id="settings-tip">Vestel MB230 oynatıcı özellikleri cihazın HTML5 desteğiyle sınırlıdır.</p>
 </section>
 <div id="toast" role="status"></div>
-<script src="./vestel-v41.js"></script>
+<script>
+/* Keep this HTML address stable; cache-bust application code after updates. */
+(function(){var script=document.createElement('script');script.src='./vestel-v41.js?fresh='+new Date().getTime();document.body.appendChild(script);})();
+</script>
 </body></html>
