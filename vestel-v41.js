@@ -37,7 +37,7 @@ function acceptedLegal(){
  // An already-paired TV has previously passed through the legal acceptance
  // screen in our deployed V4.x flow. Keep its identity and avoid prompting
  // on each Web App Tester launch if only the legal flag was lost.
- return !!(device&&validDevice(device)&&/^[0-9]{6}$/.test(String(device.activation_code||'')));
+ return !!(device&&validDevice(device));
 }
 function toast(msg){var node=el('toast');node.textContent=msg;node.style.display='block';if(overlayTimer)clearTimeout(overlayTimer);overlayTimer=setTimeout(function(){node.style.display='none';},5500);}
 function activeButtons(){var all=el(screen).querySelectorAll('.nav'),out=[],i;for(i=0;i<all.length;i++)if(!all[i].disabled&&all[i].offsetWidth>0)out.push(all[i]);return out;}
@@ -64,7 +64,21 @@ function exitLiveFullscreen(){
  el('live').className=el('live').className.replace(/\s*fullscreen\b/g,'');
  focusPlayingLiveChannel();
 }
-function switchTo(id){if(!el(id))return;exitLiveFullscreen();if(screen==='live'&&id!=='live')currentLive=null;stopVideo();var all=document.querySelectorAll('.screen'),i;for(i=0;i<all.length;i++)all[i].className=all[i].className.replace(/\s*active\b/g,'');el(id).className+=' active';screen=id;if(id==='home'){tickClock();if(dataLoaded)updateHero();}setTimeout(focusFirst,20);}
+function switchTo(id){
+ if(!el(id))return;
+ var changed=screen!==id;
+ exitLiveFullscreen();
+ if(screen==='live'&&id!=='live')currentLive=null;
+ stopVideo();
+ var all=document.querySelectorAll('.screen'),i;
+ for(i=0;i<all.length;i++)all[i].className=all[i].className.replace(/\s*active\b/g,'');
+ el(id).className+=' active';screen=id;
+ if(id==='home'){tickClock();if(dataLoaded)updateHero();}
+ // The REGAL browser may perform a native Back outside the JS key handler.
+ // Keep a same-origin same-document history stop for each page transition.
+ if(changed&&id!=='legal')guardBrowserHistory();
+ setTimeout(focusFirst,20);
+}
 function directional(key){
  var current=document.activeElement,all=activeButtons(),idx=all.indexOf?all.indexOf(current):Array.prototype.indexOf.call(all,current);
  if(!all.length)return;
@@ -385,18 +399,31 @@ function startVOD(type,x){
 }
 var reloadInProgress=false;
 function refresh(){
- // Reload the application AND its media catalog on the stable Web App Tester path.
- // Existing boot() recovers localStorage pairing and calls fetchCatalog().
- // A changing query prevents the old Vestel OMI HTML from being served from cache.
  if(reloadInProgress)return;
  reloadInProgress=true;
- toast('KUKİ PLAYER yeniden başlatılıyor. Güncel uygulama ve içerikler yükleniyor...');
+ if(acceptedLegal())rememberLegal();
+ var button=el('setting-refresh');
+ if(button){button.disabled=true;button.textContent='GÜNCELLENİYOR...';}
+ say('settings-tip','Uygulama yeniden başlatılıyor. Lütfen ana ekranın tekrar açılmasını bekleyin.');
+ toast('KUKİ PLAYER güncel sürümü ve yayın listeleri yükleniyor...');
  var path=window.location.pathname||'/kuki-player-vestel-foxxum/index-v41.html';
- var url=path+'?update='+new Date().getTime();
+ var stamp=new Date().getTime(),url=path+'?update='+stamp;
  window.setTimeout(function(){
-  try{window.location.replace(url);}
-  catch(e){window.location.href=url;}
- },250);
+  try{window.location.assign(url);}catch(e){try{window.location.href=url;}catch(e2){}}
+ },400);
+ // Some Vestel Web App Tester builds silently refuse same-page navigation.
+ // Retry with the native refresh operation, keeping persisted pairing data.
+ window.setTimeout(function(){
+  if(!reloadInProgress)return;
+  try{window.location.reload(true);}catch(e){}
+ },2800);
+ window.setTimeout(function(){
+  if(!reloadInProgress)return;
+  reloadInProgress=false;
+  if(button){button.disabled=false;button.textContent='Listeyi Yenile';}
+  say('settings-tip','Web App Tester yeniden yüklemeyi engellediyse aynı adresi bir kez yeniden açın.');
+  if(authorized)fetchCatalog();
+ },6500);
 }
 function logout(){
  if(!device||busy)return;
@@ -462,9 +489,10 @@ function confirmExit(){
    single same-URL history entry when this browser supports pushState. */
 function isRemoteBack(e){
  if(!e)return false;
- var k=e.keyCode||e.which||0, n=String(e.key||'').toLowerCase(), vk=null;
+ var k=e.keyCode||e.which||0, n=String(e.key||'').toLowerCase(), vk=null,vkAlt=null;
  try{if(typeof window.VK_BACK==='number')vk=window.VK_BACK;}catch(err){}
- return k===8||k===27||k===461||k===10009||k===166||k===vk||
+ try{if(window.KeyEvent&&typeof window.KeyEvent.VK_BACK==='number')vkAlt=window.KeyEvent.VK_BACK;}catch(err){}
+ return k===8||k===27||k===461||k===10009||k===166||k===vk||k===vkAlt||
    n==='back'||n==='backspace'||n==='browserback'||n==='goback'||n==='escape';
 }
 function consumeRemoteEvent(e){
@@ -489,7 +517,7 @@ function receiveRemoteBack(e){
  consumeRemoteEvent(e);
  if(e.type==='keyup')return false;
  var now=new Date().getTime();
- if(now-remoteBackAt>380){
+ if(now-remoteBackAt>1000){
   remoteBackAt=now;
   appBack();
  }
@@ -500,11 +528,9 @@ function guardBrowserHistory(){
   if(!window.history||typeof window.history.pushState!=='function')return;
   var state=window.history.state;
   var sameUrl=window.location.pathname+window.location.search+window.location.hash;
-  if(state&&state.kukiBackGuard==='yes'){
-   window.history.replaceState({kukiBackGuard:'yes'},'',sameUrl);
-  }else{
-   window.history.pushState({kukiBackGuard:'yes'},'',sameUrl);
-  }
+  // A fresh guard on transitions protects even when the TV firmware
+  // handles Back as a native history action rather than a keypress.
+  window.history.pushState({kukiBackGuard:'yes',kukiRoute:screen},'',sameUrl);
   remoteBackGuard=true;
  }catch(err){remoteBackGuard=false;}
 }
@@ -514,7 +540,7 @@ function browserBackEvent(){
  var now=new Date().getTime();
  // Some TVs dispatch both a key event and the native history operation
  // for one press. Never navigate twice for the same physical button.
- if(now-remoteBackAt>700){
+ if(now-remoteBackAt>1200){
   remoteBackAt=now;
   appBack();
  }
@@ -571,6 +597,9 @@ function onKey(e){
   directional(key);if(e.preventDefault)e.preventDefault();return false;
  }
  if(key===403){var x=screen==='live'?currentLive:screen==='detail'?selected:null,t=screen==='live'?'live':lastType;if(x&&t)toggleFav(t,x);return;}
+ if(key===13&&screen==='settings'&&document.activeElement===el('setting-refresh')){
+  refresh();if(e.preventDefault)e.preventDefault();return false;
+ }
  if(key===13&&document.activeElement&&document.activeElement.click&&document.activeElement.tagName!=='INPUT'){
    document.activeElement.click();if(e.preventDefault)e.preventDefault();return false;
  }
@@ -593,6 +622,9 @@ function installHandlers(){
  el('play-stop').onclick=function(){switchTo('detail');};
  el('play-toggle').onclick=function(){var v=el('movie-video');try{if(v.paused)v.play();else v.pause();}catch(e){}};
  el('setting-refresh').onclick=refresh;
+ if(el('setting-refresh').addEventListener){
+  el('setting-refresh').addEventListener('click',refresh,false);
+ }
  el('setting-exit').onclick=logout;
  el('setting-pin').onclick=function(){var current=read('kuki_vestel_parental_v1')!=='off';save('kuki_vestel_parental_v1',current?'off':'on');say('parent-label',current?'Kapalı':'Açık');toast('Ebeveyn kilidi ayarı kaydedildi. PIN koruması Vestel sürümünde henüz uygulanmadı.');};
  el('setting-lang').onclick=function(){toast('KUKİ PLAYER arayüz dili: Türkçe');};
@@ -605,6 +637,11 @@ function installHandlers(){
   window.addEventListener('keyup',receiveRemoteBack,true);
   window.addEventListener('popstate',browserBackEvent,false);
  }
+ if(document.addEventListener){
+  document.addEventListener('keypress',receiveRemoteBack,true);
+  document.addEventListener('keydown',receiveRemoteBack,true);
+ }
+ window.onkeypress=function(e){if(isRemoteBack(e))return receiveRemoteBack(e);};
  document.onkeypress=function(e){if(isRemoteBack(e))return receiveRemoteBack(e);};
  guardBrowserHistory();
  el('movie-video').ontimeupdate=function(){var n=Number(this.currentTime)||0,d=Number(this.duration)||0;say('play-time',Math.floor(n/60)+':'+(n%60<10?'0':'')+Math.floor(n%60)+(d?' / '+Math.floor(d/60)+':'+(d%60<10?'0':'')+Math.floor(d%60):''));};
@@ -612,6 +649,9 @@ function installHandlers(){
 }
 function boot(){
  installHandlers();say('parent-label',read('kuki_vestel_parental_v1')==='off'?'Kapalı':'Açık');device=loadDevice();
+ // An established paired device has already traversed legal acceptance.
+ // Restore the marker without risking a repeated disclaimer.
+ if(device&&validDevice(device))rememberLegal();
  if(acceptedLegal()){rememberLegal();switchTo('pair');if(device&&device.activation_code)say('pair-code',device.activation_code);beginPair();}
  else{switchTo('legal');el('legal-text').focus();legalUpdate();}
 }
