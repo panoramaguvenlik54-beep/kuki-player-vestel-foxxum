@@ -362,8 +362,11 @@ function startSource(video,url,label,isLive,fallback){
   catch(e){toast('Video başlatılamadı.');}
  }
  function fail(msg){if(isLive){say('live-cover',msg);el('live-cover').style.display='flex';}
-  else say('play-hint',msg);toast(msg);}
- video.onplaying=function(){if(isLive)el('live-cover').style.display='none';else say('play-hint',label);};
+  else {el('play-hint').style.display='block';say('play-hint',msg);}toast(msg);}
+ video.onplaying=function(){
+  if(isLive)el('live-cover').style.display='none';
+  else{el('play-hint').style.display='none';updateVodProgress();showVodControls();}
+ };
  video.onerror=function(){
   if(fallback&&url!==fallback){startSource(video,fallback,label,isLive,'');return;}
   fail('Yayın oynatılamadı. Video biçimi, HTTPS, CORS ve TV desteğini kontrol edin.');
@@ -416,12 +419,140 @@ function playLive(x){
  var url=sourceURL('live',x),alt=url.replace(/\.m3u8$/i,'.ts');
  startSource(el('live-video'),url,titleOf(x),true,alt!==url?alt:'');
 }
+
+/* Audio/subtitle options come exclusively from the currently opened Xtream stream. */
+function fmtVodTime(sec){
+ sec=Math.max(0,Math.floor(Number(sec)||0));
+ var h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;
+ var p=function(n){return n<10?'0'+n:String(n);};
+ return h?h+':'+p(m)+':'+p(s):p(m)+':'+p(s);
+}
+function updateVodProgress(){
+ var v=el('movie-video'),d=Number(v.duration),now=Number(v.currentTime)||0,r=el('play-progress');
+ var seekable=isFinite(d)&&d>0;
+ r.disabled=!seekable;r.value=seekable?Math.round(Math.max(0,Math.min(1,now/d))*1000):0;
+ say('play-time',fmtVodTime(now)+' / '+(seekable?fmtVodTime(d):'--:--'));
+}
+function updateVodPlayIcon(){
+ var v=el('movie-video'),playing=!v.paused&&!v.ended,b=el('play-toggle');
+ b.innerHTML=playing?'❚❚ <small>DURAKLAT</small>':'▶ <small>OYNAT</small>';
+ b.setAttribute('aria-label',playing?'Duraklat':'Oynat');
+}
+function showVodControls(){
+ if(screen!=='play-screen')return;
+ el('play-transport').className='';
+ if(playerHideTimer){clearTimeout(playerHideTimer);playerHideTimer=null;}
+ updateVodPlayIcon();updateVodProgress();
+ if(trackPanelOpen||el('movie-video').paused||el('movie-video').ended)return;
+ playerHideTimer=setTimeout(function(){
+  playerHideTimer=null;
+  if(screen==='play-screen'&&!trackPanelOpen&&!el('movie-video').paused){
+   el('play-transport').className='hidden';
+  }
+ },4800);
+}
+function resetVodControls(){
+ if(playerHideTimer){clearTimeout(playerHideTimer);playerHideTimer=null;}
+ trackPanelOpen=false;
+ el('play-track-options').className='hidden';
+ el('play-track-list').innerHTML='';
+ el('play-transport').className='';
+}
+function seekVod(delta){
+ var v=el('movie-video'),d=Number(v.duration);
+ if(!isFinite(d)||d<=0){toast('Bu içerikte ileri/geri sarma desteklenmiyor.');showVodControls();return;}
+ try{v.currentTime=Math.max(0,Math.min(d,(Number(v.currentTime)||0)+delta));}
+ catch(e){toast('Bu yayında konum değiştirilemedi.');}
+ showVodControls();
+}
+function selectVodPosition(){
+ var v=el('movie-video'),d=Number(v.duration),pos=Number(el('play-progress').value)||0;
+ if(!isFinite(d)||d<=0)return;
+ try{v.currentTime=d*Math.min(1000,Math.max(0,pos))/1000;}catch(e){}
+ showVodControls();
+}
+function toggleVodPause(){
+ var v=el('movie-video');
+ try{if(v.paused){var p=v.play();if(p&&p.catch)p.catch(function(){});}else v.pause();}
+ catch(e){toast('Oynatıcı komutu desteklenmiyor.');}
+ updateVodPlayIcon();showVodControls();
+}
+function closeVodTrackChoices(){
+ trackPanelOpen=false;el('play-track-options').className='hidden';
+ el('play-track-list').innerHTML='';showVodControls();
+}
+function vodTrackName(t,i){
+ return String((t&&(t.label||t.name||t.lang||t.language))||('Parça '+(i+1)));
+}
+function chooseVodTrack(kind){
+ if(screen!=='play-screen')return;
+ if(playerHideTimer){clearTimeout(playerHideTimer);playerHideTimer=null;}
+ var list=el('play-track-list'),v=el('movie-video'),options=[],i;
+ list.innerHTML='';
+ var isAudio=kind==='audio',heading=isAudio?'Ses Dili':'Altyazı';
+ say('play-track-heading',heading+' — Xtream yayını');
+ var hTracks=playerHls?(isAudio?playerHls.audioTracks:playerHls.subtitleTracks):null;
+ var hlsUse=!!(hTracks&&hTracks.length);
+ if(hlsUse){
+  for(i=0;i<hTracks.length;i++){
+   (function(index){
+    options.push({name:vodTrackName(hTracks[index],index),apply:function(){
+     try{
+      if(isAudio)playerHls.audioTrack=index;
+      else{playerHls.subtitleDisplay=true;playerHls.subtitleTrack=index;}
+     }catch(e){toast('TV bu medya parçasını seçemedi.');}
+    }});
+   })(i);
+  }
+ }else{
+  var tracks=isAudio?v.audioTracks:v.textTracks;
+  if(tracks&&tracks.length){
+   for(i=0;i<tracks.length;i++){
+    (function(index){
+     var track=tracks[index];
+     if(!isAudio&&track.kind&&track.kind!=='subtitles'&&track.kind!=='captions')return;
+     options.push({name:vodTrackName(track,index),apply:function(){
+      try{
+       var k;
+       if(isAudio){for(k=0;k<tracks.length;k++)tracks[k].enabled=(k===index);}
+       else{for(k=0;k<tracks.length;k++)tracks[k].mode=(k===index?'showing':'disabled');}
+      }catch(e){toast('TV bu medya parçasını seçemedi.');}
+     }});
+    })(i);
+   }
+  }
+ }
+ if(!isAudio){
+  options.unshift({name:'KAPALI',apply:function(){
+   try{
+    if(hlsUse){playerHls.subtitleTrack=-1;playerHls.subtitleDisplay=false;}
+    else if(v.textTracks){for(var k=0;k<v.textTracks.length;k++)v.textTracks[k].mode='disabled';}
+   }catch(e){}
+  }});
+ }
+ if(!options.length){toast('Bu Xtream içeriğinde seçilebilir '+heading.toLowerCase()+' parçası bulunamadı.');closeVodTrackChoices();return;}
+ if(!isAudio&&options.length===1)toast('Bu Xtream içeriğinde altyazı parçası yok.');
+ trackPanelOpen=true;el('play-transport').className='';el('play-track-options').className='';
+ for(i=0;i<options.length;i++){
+  (function(item){
+   var button=makeButton(item.name,'play-track-choice',function(){item.apply();closeVodTrackChoices();toast(heading+': '+item.name);});
+   list.appendChild(button);
+  })(options[i]);
+ }
+ try{var all=list.querySelectorAll('button');if(all.length)all[0].focus();}catch(e){}
+}
+
 function startVOD(type,x){
  if(!authorized){toast('Menü ön izlemesinde yayın oynatılamaz.');return;}
  var url=sourceURL(type,x);
  switchTo('play-screen');
+ resetVodControls();
+ el('play-hint').style.display='block';
  say('play-hint',titleOf(x));
+ updateVodProgress();updateVodPlayIcon();
  startSource(el('movie-video'),url,titleOf(x),false,'');
+ showVodControls();
+ window.setTimeout(function(){if(screen==='play-screen')try{el('play-toggle').focus();}catch(e){}},70);
 }
 var reloadInProgress=false;
 function refresh(){
@@ -533,7 +664,7 @@ function consumeRemoteEvent(e){
 function appBack(){
  if(exitDialogOpen){dismissExitDialog();return;}
  if(liveFullscreen){exitLiveFullscreen();return;}
- if(screen==='play-screen'){switchTo('detail');return;}
+ if(screen==='play-screen'){resetVodControls();switchTo('detail');return;}
  if(screen==='detail'){switchTo(lastType);return;}
  if(screen==='live'||screen==='movies'||screen==='series'||screen==='settings'){
   switchTo('home');return;
@@ -619,7 +750,24 @@ function onKey(e){
   if(key===13||key===37||key===39){if(e.preventDefault)e.preventDefault();return false;}
  }
  /* Back navigation is handled before screen-specific keys and in capture phase. */
- if(screen==='play-screen'&&(key===415||key===19||key===13)){el('play-toggle').click();if(e.preventDefault)e.preventDefault();return false;}
+ if(screen==='play-screen'){
+  var hiddenControls=el('play-transport').className==='hidden';
+  if(key===415||key===19){toggleVodPause();}
+  else if(key===412){seekVod(-10);}
+  else if(key===417){seekVod(10);}
+  else if((key===37||key===38||key===39||key===40)&&hiddenControls){
+   showVodControls();try{el('play-toggle').focus();}catch(er){}
+  }
+  else if((key===37||key===39)&&document.activeElement===el('play-progress'))seekVod(key===37?-10:10);
+  else if(key===37||key===38||key===39||key===40){showVodControls();directional(key);}
+  else if(key===13){
+   if(hiddenControls){showVodControls();try{el('play-toggle').focus();}catch(er){}}
+   else if(document.activeElement&&document.activeElement.tagName==='BUTTON'&&document.activeElement.click){
+    document.activeElement.click();showVodControls();
+   }else toggleVodPause();
+  }else return;
+  if(e.preventDefault)e.preventDefault();return false;
+ }
  if((key===37||key===38||key===39||key===40)&&screen!=='play-screen'){
   if(document.activeElement&&document.activeElement.tagName==='INPUT'&&key===37)return;
   directional(key);if(e.preventDefault)e.preventDefault();return false;
@@ -647,8 +795,22 @@ function installHandlers(){
  el('detail-fav').onclick=function(){if(selected){toggleFav(lastType,selected);say('detail-fav',hasFav(lastType,selected)?'♥ FAVORİDEN ÇIKAR':'♥ FAVORİ');}};
  el('exit-yes').onclick=confirmExit;
  el('exit-no').onclick=dismissExitDialog;
- el('play-stop').onclick=function(){switchTo('detail');};
- el('play-toggle').onclick=function(){var v=el('movie-video');try{if(v.paused)v.play();else v.pause();}catch(e){}};
+ el('play-stop').onclick=function(){resetVodControls();switchTo('detail');};
+ el('play-toggle').onclick=toggleVodPause;
+ el('play-rewind').onclick=function(){seekVod(-10);};
+ el('play-forward').onclick=function(){seekVod(10);};
+ el('play-audio').onclick=function(){chooseVodTrack('audio');};
+ el('play-subtitle').onclick=function(){chooseVodTrack('subtitle');};
+ el('play-progress').onchange=selectVodPosition;
+ el('play-progress').oninput=function(){
+  var d=Number(el('movie-video').duration),k=Number(this.value)||0;
+  if(isFinite(d)&&d>0)say('play-time',fmtVodTime(d*k/1000)+' / '+fmtVodTime(d));
+ };
+ el('play-screen').onmousemove=showVodControls;
+ el('movie-video').onpause=function(){updateVodPlayIcon();showVodControls();};
+ el('movie-video').onplay=function(){updateVodPlayIcon();showVodControls();};
+ el('movie-video').onended=showVodControls;
+ el('movie-video').onloadedmetadata=updateVodProgress;
  el('setting-refresh').onclick=refresh;
  if(el('setting-refresh').addEventListener){
   el('setting-refresh').addEventListener('click',refresh,false);
@@ -672,7 +834,7 @@ function installHandlers(){
  window.onkeypress=function(e){if(isRemoteBack(e))return receiveRemoteBack(e);};
  document.onkeypress=function(e){if(isRemoteBack(e))return receiveRemoteBack(e);};
  guardBrowserHistory();
- el('movie-video').ontimeupdate=function(){var n=Number(this.currentTime)||0,d=Number(this.duration)||0;say('play-time',Math.floor(n/60)+':'+(n%60<10?'0':'')+Math.floor(n%60)+(d?' / '+Math.floor(d/60)+':'+(d%60<10?'0':'')+Math.floor(d%60):''));};
+ el('movie-video').ontimeupdate=updateVodProgress;
  setInterval(function(){if(screen==='home')tickClock();},60000);
 }
 function boot(){
