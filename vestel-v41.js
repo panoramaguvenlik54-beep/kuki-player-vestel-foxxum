@@ -24,10 +24,22 @@ function enterLiveFullscreen(){
  liveFullscreen=true;
  el('live').className+=' fullscreen';
 }
+function focusPlayingLiveChannel(){
+ if(screen!=='live'||!currentLive)return;
+ var nodes=el('live-list').querySelectorAll('button[data-stream-id]'),i,
+     id=itemID('live',currentLive);
+ for(i=0;i<nodes.length;i++){
+  if(nodes[i].getAttribute('data-stream-id')===id){
+   try{nodes[i].focus();nodes[i].scrollIntoView(false);}catch(e){}
+   break;
+  }
+ }
+}
 function exitLiveFullscreen(){
  if(!liveFullscreen)return;
  liveFullscreen=false;
  el('live').className=el('live').className.replace(/\s*fullscreen\b/g,'');
+ focusPlayingLiveChannel();
 }
 function switchTo(id){if(!el(id))return;exitLiveFullscreen();if(screen==='live'&&id!=='live')currentLive=null;stopVideo();var all=document.querySelectorAll('.screen'),i;for(i=0;i<all.length;i++)all[i].className=all[i].className.replace(/\s*active\b/g,'');el(id).className+=' active';screen=id;if(id==='home'){tickClock();if(dataLoaded)updateHero();}setTimeout(focusFirst,20);}
 function directional(key){
@@ -153,6 +165,7 @@ function drawType(type){
   (function(item){
    if(type==='live'){
     var node=makeButton((hasFav(type,item)?'♥ ':'')+titleOf(item),'rowitem',function(){playLive(item);});
+    node.setAttribute('data-stream-id',itemID('live',item));
     root.appendChild(node);
    }else{
     var card=document.createElement('button');card.type='button';card.className='poster nav';
@@ -239,6 +252,31 @@ function startSource(video,url,label,isLive,fallback){
  }
  video.src=url;play();
 }
+function changeFullscreenChannel(direction){
+ if(!liveFullscreen||!currentLive)return;
+ // Respect the channel category and search currently selected in the TV list.
+ var available=filtered('live'),i=-1,k,target,next;
+ if(available.length===0)available=lists.live;
+ if(!available.length){toast('Kanal listesi boş.');return;}
+ for(k=0;k<available.length;k++){
+  if(itemID('live',available[k])===itemID('live',currentLive)){i=k;break;}
+ }
+ if(i<0){
+  available=lists.live;
+  for(k=0;k<available.length;k++){
+   if(itemID('live',available[k])===itemID('live',currentLive)){i=k;break;}
+  }
+ }
+ if(!available.length)return;
+ next=(i+direction+available.length)%available.length;
+ target=available[next];
+ if(!target||itemID('live',target)===itemID('live',currentLive))return;
+ // New channel needs a new stream; the fullscreen DOM layout stays in place.
+ currentLive=target;
+ say('live-name',titleOf(target));
+ var url=sourceURL('live',target),alt=url.replace(/\.m3u8$/i,'.ts');
+ startSource(el('live-video'),url,titleOf(target),true,alt!==url?alt:'');
+}
 function playLive(x){
  // Second OK on the same channel expands the existing video without
  // calling stopVideo(), changing the source URL or seeking.
@@ -293,8 +331,23 @@ function onKey(e){
   if(e.preventDefault)e.preventDefault();return false;
  }
  if(liveFullscreen){
-  if(key===8||key===27||key===461||key===10009||key===166){exitLiveFullscreen();if(e.preventDefault)e.preventDefault();return false;}
-  if(key===13||key===37||key===38||key===39||key===40){if(e.preventDefault)e.preventDefault();return false;}
+  // Vestel program +/- variants, browser PageUp/PageDown,
+  // generic Smart TV CH+/CH-, plus arrow up/down as a fallback.
+  var keyName=String(e.key||'').toLowerCase();
+  var channelUp=(key===427||key===1032||key===33||key===38||
+    keyName==='channelup'||keyName==='pageup');
+  var channelDown=(key===428||key===1033||key===34||key===40||
+    keyName==='channeldown'||keyName==='pagedown');
+  if(channelUp||channelDown){
+   changeFullscreenChannel(channelUp?1:-1);
+   if(e.preventDefault)e.preventDefault();
+   if(e.stopPropagation)e.stopPropagation();
+   return false;
+  }
+  if(key===8||key===27||key===461||key===10009||key===166){
+   exitLiveFullscreen();if(e.preventDefault)e.preventDefault();return false;
+  }
+  if(key===13||key===37||key===39){if(e.preventDefault)e.preventDefault();return false;}
  }
  if(key===8||key===27||key===461||key===10009||key===166){if(screen==='play-screen')switchTo('detail');else if(screen==='detail')switchTo(lastType);else if(screen!=='home'&&screen!=='pair')switchTo('home');else if(screen==='home'){toast('KUKİ PLAYER ana menü');}if(e.preventDefault)e.preventDefault();return false;}
  if(screen==='play-screen'&&(key===415||key===19||key===13)){el('play-toggle').click();if(e.preventDefault)e.preventDefault();return false;}
