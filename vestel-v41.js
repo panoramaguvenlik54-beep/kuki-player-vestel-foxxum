@@ -361,13 +361,20 @@ function startVOD(type,x){
  say('play-hint',titleOf(x));
  startSource(el('movie-video'),url,titleOf(x),false,'');
 }
-function refresh(){if(!authorized){toast('Önce cihaz etkinleştirilmelidir.');return;}fetchCatalog();}
-function updateApplication(){
- // Reload at the same saved Web App Tester path with a different query string,
- // avoiding obsolete HTML/CSS/JS caches on Vestel OMI without changing devices.
- var url=window.location.pathname+'?update='+new Date().getTime();
- toast('KUKİ PLAYER yeni sürüm kontrol ediliyor...');
- window.location.replace(url);
+var reloadInProgress=false;
+function refresh(){
+ // Reload the application AND its media catalog on the stable Web App Tester path.
+ // Existing boot() recovers localStorage pairing and calls fetchCatalog().
+ // A changing query prevents the old Vestel OMI HTML from being served from cache.
+ if(reloadInProgress)return;
+ reloadInProgress=true;
+ toast('KUKİ PLAYER yeniden başlatılıyor. Güncel uygulama ve içerikler yükleniyor...');
+ var path=window.location.pathname||'/kuki-player-vestel-foxxum/index-v41.html';
+ var url=path+'?update='+new Date().getTime();
+ window.setTimeout(function(){
+  try{window.location.replace(url);}
+  catch(e){window.location.href=url;}
+ },250);
 }
 function logout(){
  if(!device||busy)return;
@@ -440,7 +447,6 @@ function installHandlers(){
  el('play-stop').onclick=function(){switchTo('detail');};
  el('play-toggle').onclick=function(){var v=el('movie-video');try{if(v.paused)v.play();else v.pause();}catch(e){}};
  el('setting-refresh').onclick=refresh;
- el('setting-app-update').onclick=updateApplication;
  el('setting-exit').onclick=logout;
  el('setting-pin').onclick=function(){var current=read('kuki_vestel_parental_v1')!=='off';save('kuki_vestel_parental_v1',current?'off':'on');say('parent-label',current?'Kapalı':'Açık');toast('Ebeveyn kilidi ayarı kaydedildi. PIN koruması Vestel sürümünde henüz uygulanmadı.');};
  el('setting-lang').onclick=function(){toast('KUKİ PLAYER arayüz dili: Türkçe');};
