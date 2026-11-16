@@ -186,8 +186,20 @@ function requestJSON(url,payload,callback){
   xhr.send(payload?JSON.stringify(payload):null);
  }catch(e){finish('TV tarayıcısı bağlantıyı başlatamadı.');}
 }
+function foxxumMetadata(){
+ var values={}, ua='';
+ try{ua=String((window.navigator&&window.navigator.userAgent)||'');}catch(e){}
+ // Only report explicitly declared OS versions; OMI browser version is not the OS.
+ var os=ua.match(/\b(?:FoxxumOS|VestelOS|Linux)[\s\/]+([0-9]+(?:\.[0-9]+){1,3})\b/i);
+ if(os)values.os_version=String(os[0]).slice(0,60);
+ // Do not infer a model year from browser or firmware release numbers.
+ var year=ua.match(/\b(?:model[_-]?year|tv[_-]?year)[\s:=\/]+(20(?:1[7-9]|2[0-9]))\b/i);
+ if(year)values.model_year=parseInt(year[1],10);
+ return values;
+}
 function deviceCall(action,extra,cb){
- var b={action:action,platform:'vestel_foxxum',app_version:'foxxum-v4.2'},k;
+ var b={action:action,platform:'vestel_foxxum',app_version:'foxxum-v4.2'},k,m=foxxumMetadata();
+ for(k in m)if(Object.prototype.hasOwnProperty.call(m,k))b[k]=m[k];
  for(k in extra)if(Object.prototype.hasOwnProperty.call(extra,k))b[k]=extra[k];
  requestJSON(API,b,function(error,data){
   if(!error&&(!data||data.success!==true))error=(data&&data.message)||'Cihaz API yanıtı geçersiz.';
@@ -1148,6 +1160,12 @@ function installHandlers(){
  guardBrowserHistory();
  el('movie-video').ontimeupdate=updateVodProgress;
  setInterval(function(){if(screen==='home')tickClock();},60000);
+ // Update last_seen_at while TV app runs; only token-authenticated requests are accepted.
+ // No re-registration, no pairing code renewal, no changes to playback credentials.
+ setInterval(function(){
+  if(!authorized||!validDevice(device)||busy||document.hidden===true)return;
+  deviceCall('check_activation',{device_id:device.device_id,device_token:device.device_token},function(){});
+ },600000);
 }
 function boot(){
  installHandlers();say('parent-label',parentActive()?'Açık':'Kapalı');device=loadDevice();
