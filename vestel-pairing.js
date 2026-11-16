@@ -18,7 +18,7 @@
   function el(id) { return document.getElementById(id); }
   function put(id, value) { var e = el(id); if (e) e.textContent = String(value); }
   function validDevice(x) {
-    return x && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x.device_id || '') &&
+    return x && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x.device_id || '') &&
       /^[0-9a-f]{64}$/i.test(x.device_token || '');
   }
   function loadDevice(){
