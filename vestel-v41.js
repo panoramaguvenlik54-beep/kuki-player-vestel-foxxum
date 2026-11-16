@@ -187,7 +187,7 @@ function requestJSON(url,payload,callback){
  }catch(e){finish('TV tarayıcısı bağlantıyı başlatamadı.');}
 }
 function deviceCall(action,extra,cb){
- var b={action:action,platform:'vestel_foxxum',app_version:'foxxum-v4.0'},k;
+ var b={action:action,platform:'vestel_foxxum',app_version:'foxxum-v4.2'},k;
  for(k in extra)if(Object.prototype.hasOwnProperty.call(extra,k))b[k]=extra[k];
  requestJSON(API,b,function(error,data){
   if(!error&&(!data||data.success!==true))error=(data&&data.message)||'Cihaz API yanıtı geçersiz.';
