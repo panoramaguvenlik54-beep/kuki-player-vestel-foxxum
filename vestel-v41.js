@@ -1,8 +1,9 @@
-/* KUKİ PLAYER Vestel/Foxxum 4.0: ES5 browser client, Samsung/LG-style TV UI */
+/* KUKİ PLAYER Foxxum V4.2: protected device registration and manual code rotation. */
 (function (window,document) {
 'use strict';
 var API='https://jelkfpfpqaialuwhelhd.supabase.co/functions/v1/kuki-device-api';
 var STORE='kuki_foxxum_device_identity_v1', LEGAL='kuki_foxxum_legal_v1';
+var IDB_NAME='kuki_foxxum_identity_v1', IDB_STORE='identity', idChecked=false, attempted=false, repaired=false, deletedOnServer=false;
 var screen='legal', device=null, authorized=false, busy=false, playerHls=null, playerTs=null, currentLive=null;
 var server='',username='',password='', dataLoaded=false, loading=false, overlayTimer=null;
 var lists={live:[],movies:[],series:[]},cats={live:[],movies:[],series:[]};
@@ -21,7 +22,67 @@ function read(k){try{return window.localStorage.getItem(k)||'';}catch(e){return 
 function del(k){try{window.localStorage.removeItem(k);}catch(e){}}
 function escapeText(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function validDevice(x){return !!(x&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x.device_id||'')&&/^[0-9a-f]{64}$/i.test(x.device_token||''));}
-function loadDevice(){var v=null;try{v=JSON.parse(read(STORE));}catch(e){}return validDevice(v)?v:null;}
+function loadDevice(){
+ var v=null,raw=read(STORE);
+ if(!raw){try{raw=window.sessionStorage.getItem(STORE)||'';}catch(e){}}
+ try{v=JSON.parse(raw);}catch(e){}
+ return validDevice(v)?v:null;
+}
+function localStoreOK(){
+ var k='kuki_foxxum_store_probe_v1';
+ try{window.localStorage.setItem(k,'1');var ok=window.localStorage.getItem(k)==='1';window.localStorage.removeItem(k);return ok;}catch(e){return false;}
+}
+function idb(op,value,cb){
+ var db=null,req,done=false,timeout;
+ function finish(result){
+  if(done)return;done=true;if(timeout)clearTimeout(timeout);
+  if(db)try{db.close();}catch(e){}
+  cb(result);
+ }
+ if(!window.indexedDB){cb(op==='read'?null:false);return;}
+ try{
+  req=window.indexedDB.open(IDB_NAME,1);
+  timeout=setTimeout(function(){finish(op==='read'?null:false);},2700);
+  req.onupgradeneeded=function(){
+   try{if(!req.result.objectStoreNames.contains(IDB_STORE))req.result.createObjectStore(IDB_STORE);}catch(e){}
+  };
+  req.onerror=function(){finish(op==='read'?null:false);};
+  req.onblocked=function(){finish(op==='read'?null:false);};
+  req.onsuccess=function(){
+   if(done){try{req.result.close();}catch(e){}return;}
+   db=req.result;
+   try{
+    var tx=db.transaction([IDB_STORE],op==='read'?'readonly':'readwrite');
+    var r=op==='read'?tx.objectStore(IDB_STORE).get('current'):tx.objectStore(IDB_STORE).put(value,op==='probe'?'probe':'current');
+    if(op==='read')r.onsuccess=function(){finish(validDevice(r.result)?r.result:null);};
+    else tx.oncomplete=function(){finish(true);};
+    r.onerror=function(){finish(op==='read'?null:false);};
+    tx.onabort=function(){finish(op==='read'?null:false);};
+   }catch(e){finish(op==='read'?null:false);}
+  };
+ }catch(e){finish(op==='read'?null:false);}
+}
+function persistIdentity(value,cb){
+ var raw=JSON.stringify(value),local=save(STORE,raw)&&read(STORE)===raw;
+ try{window.sessionStorage.setItem(STORE,raw);}catch(e){}
+ idb('write',value,function(ok){cb(local||ok);});
+}
+function rememberDevice(cb){
+ if(!device)device=loadDevice();
+ if(device){persistIdentity(device,function(){cb();});return;}
+ idb('read',null,function(value){
+  if(value){device=value;var raw=JSON.stringify(value);save(STORE,raw);try{window.sessionStorage.setItem(STORE,raw);}catch(e){}}
+  cb();
+ });
+}
+function storageAvailable(cb){
+ if(localStoreOK()){cb(true);return;}
+ idb('probe','1',function(ok){cb(ok);});
+}
+function forgetIdentity(cb){
+ del(STORE);try{window.sessionStorage.removeItem(STORE);}catch(e){}
+ idb('write',null,function(){cb();});
+}
 function legalCookieAccepted(){
  try{return /(?:^|;\s*)kuki_foxxum_legal_v1=1(?:;|$)/.test(document.cookie||'');}
  catch(e){return false;}
@@ -133,28 +194,85 @@ function deviceCall(action,extra,cb){
   cb(error,data||{});
  });
 }
+function newPairingCode(manual){
+ if(busy||!device||!validDevice(device))return;
+ if(manual&&!window.confirm('Yeni kod alındığında bu cihazın mevcut yayın hesabı kaldırılacak. Devam edilsin mi?'))return;
+ busy=true;el('pair-retry').disabled=true;el('pair-new-code').disabled=true;
+ function finish(){busy=false;el('pair-retry').disabled=false;el('pair-new-code').disabled=false;}
+ say('pair-status','Yeni kod alınıyor...');
+ if(deletedOnServer){
+  forgetIdentity(function(){device=null;deletedOnServer=false;attempted=false;finish();beginPair();});
+  return;
+ }
+ deviceCall('reset_pairing',{device_id:device.device_id,device_token:device.device_token},function(err,data){
+  if(err){finish();say('pair-status','Yeni kod alınamadı: '+err);return;}
+  if(!/^[0-9]{6}$/.test(String(data.activation_code||''))){finish();say('pair-status','Sunucu geçerli yeni kod vermedi.');return;}
+  device.activation_code=String(data.activation_code);
+  authorized=false;server='';username='';password='';dataLoaded=false;
+  persistIdentity(device,function(saved){
+   finish();say('pair-code',device.activation_code);
+   say('pair-status',saved?'Yeni kod hazır. www.kukiplayer.net adresinden aktifleştirin.':'TV kalıcı hafızası yeni kodu saklayamadı.');
+  });
+ });
+}
 function beginPair(){
  if(busy)return;
  busy=true;say('pair-status','Cihaz hesabı kontrol ediliyor...');el('pair-retry').disabled=true;
+ if(!idChecked){
+  idChecked=true;
+  rememberDevice(function(){busy=false;el('pair-retry').disabled=false;beginPair();});
+  return;
+ }
  if(!device)device=loadDevice();
- if(device){deviceCall('check_activation',{device_id:device.device_id,device_token:device.device_token},function(err,d){
+ if(device){
+  deviceCall('check_activation',{device_id:device.device_id,device_token:device.device_token},function(err,d){
+   busy=false;el('pair-retry').disabled=false;
+   if(err){
+    if(err.indexOf('Cihaz kaydı silinmiş')>=0){
+     deletedOnServer=true;say('pair-status','Eski kayıt silinmiş. TV üzerinden YENİ KOD AL seçeneğini kullanın.');return;
+    }
+    say('pair-status','Kontrol başarısız: '+err);return;
+   }
+   deletedOnServer=false;
+   if(d.activation==='active'&&d.server_url&&d.account_username&&d.account_password){
+    authorized=true;server=String(d.server_url).replace(/\/+$/,'');username=String(d.account_username);password=String(d.account_password);
+    say('pair-status','Cihaz etkinleştirildi. Menü açılıyor...');
+    switchTo('home');fetchCatalog();return;
+   }
+   if(!/^[0-9]{6}$/.test(String(d.activation_code||''))){
+    if(d.activation==='pending'&&!repaired){repaired=true;newPairingCode(false);return;}
+    say('pair-status','Cihaz kodu geçersiz. YENİ KOD AL seçeneğini kullanın.');return;
+   }
+   if(device.activation_code!==String(d.activation_code)){
+    device.activation_code=String(d.activation_code);persistIdentity(device,function(){});
+   }
+   say('pair-code',device.activation_code);
+   say('pair-status','Eşleştirme bekleniyor. www.kukiplayer.net üzerinden etkinleştirin.');
+  });return;
+ }
+ if(attempted){
   busy=false;el('pair-retry').disabled=false;
-  if(err){say('pair-status','Kontrol başarısız: '+err);return;}
-  if(d.activation_code&&/^[0-9]{6}$/.test(String(d.activation_code))){device.activation_code=String(d.activation_code);save(STORE,JSON.stringify(device));}
-  if(d.activation==='active'&&d.server_url&&d.account_username&&d.account_password){
-   authorized=true;server=String(d.server_url).replace(/\/+$/,'');username=String(d.account_username);password=String(d.account_password);
-   say('pair-status','Cihaz etkinleştirildi. Menü açılıyor...');
-   switchTo('home');fetchCatalog();return;
+  say('pair-status','Bu oturumda yeni cihaz kaydı zaten denendi. Gereksiz kod oluşmaması için TV hafızasını kontrol edin.');
+  return;
+ }
+ attempted=true;
+ storageAvailable(function(ok){
+  if(!ok){
+   busy=false;el('pair-retry').disabled=false;
+   say('pair-status','TV kalıcı kayıt izni vermiyor. Yeni cihaz kodu oluşturulmadı. Depolamayı kontrol edin.');return;
   }
-  say('pair-code',device.activation_code||'------');say('pair-status','Eşleştirme bekleniyor. Yönetim panelinden etkinleştirdikten sonra TEKRAR YÜKLE deyin.');
- });return;}
- deviceCall('register_device',{},function(err,d){
-  busy=false;el('pair-retry').disabled=false;
-  if(err){say('pair-status','Kayıt başarısız: '+err);return;}
-  var value={device_id:String(d.device_id||''),device_token:String(d.device_token||''),activation_code:String(d.activation_code||'')};
-  if(!validDevice(value)||!/^[0-9]{6}$/.test(value.activation_code)){say('pair-status','Cihaz kimliği ya da kodu beklenen biçimde gelmedi.');return;}
-  device=value;save(STORE,JSON.stringify(device));say('pair-code',device.activation_code);
-  say('pair-status','Kod hazır. www.kukiplayer.net panelinde cihazı etkinleştirin.');
+  deviceCall('register_device',{},function(err,d){
+   if(err){busy=false;el('pair-retry').disabled=false;say('pair-status','Kayıt başarısız: '+err);return;}
+   var value={device_id:String(d.device_id||''),device_token:String(d.device_token||''),activation_code:String(d.activation_code||'')};
+   if(!validDevice(value)||!/^[0-9]{6}$/.test(value.activation_code)){
+    busy=false;el('pair-retry').disabled=false;say('pair-status','Geçersiz cihaz yanıtı. Yeni kod istemeyin.');return;
+   }
+   device=value;
+   persistIdentity(device,function(saved){
+    busy=false;el('pair-retry').disabled=false;say('pair-code',device.activation_code);
+    say('pair-status',saved?'Cihaz kodu hazır. Kod sonraki açılışlarda korunur.':'TV cihaz kimliğini kalıcı hafızaya kaydedemedi; depolamayı kontrol edin.');
+   });
+  });
  });
 }
 function apiBase(){return server+'/player_api.php?username='+encodeURIComponent(username)+'&password='+encodeURIComponent(password);}
@@ -745,7 +863,7 @@ function logout(){
   busy=false;
   if(err){toast('Hesaptan çıkış başarısız: '+err);return;}
   authorized=false;server='';username='';password='';dataLoaded=false;lists={live:[],movies:[],series:[]};cats={live:[],movies:[],series:[]};
-  device.activation_code=d.activation_code;save(STORE,JSON.stringify(device));say('pair-code',device.activation_code);
+  device.activation_code=d.activation_code;persistIdentity(device,function(saved){if(!saved)toast('Cihaz kodu TV hafızasına kaydedilemedi.');});say('pair-code',device.activation_code);
   say('pair-status','Yeni kod hazır. Yönetim panelinden yeniden etkinleştirin.');
   switchTo('pair');
  });
@@ -964,6 +1082,7 @@ function installHandlers(){
  el('legal-text').onscroll=legalUpdate;
  el('legal-accept').onclick=function(){if(this.disabled)return;rememberLegal();switchTo('pair');beginPair();};
  el('pair-retry').onclick=beginPair;
+  el('pair-new-code').onclick=function(){newPairingCode(true);};
  el('pair-demo').onclick=function(){authorized=false;switchTo('home');updateHero();};
  el('live-search').oninput=function(){drawType('live');};
  el('movies-search').oninput=function(){drawType('movies');};
