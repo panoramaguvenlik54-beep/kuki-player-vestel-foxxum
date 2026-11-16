@@ -102,6 +102,17 @@
   }
   // OMI 4.13 can emit readyState=4 before exposing the final response body.
   // Prefer onload and defer readyState parsing; never print device tokens.
+  function foxxumMetadata(){
+   var values={}, ua='';
+   try{ua=String((window.navigator&&window.navigator.userAgent)||'');}catch(e){}
+   // Only report explicitly declared OS versions; OMI browser version is not the OS.
+   var os=ua.match(/\b(?:FoxxumOS|VestelOS|Linux)[\s\/]+([0-9]+(?:\.[0-9]+){1,3})\b/i);
+   if(os)values.os_version=String(os[0]).slice(0,60);
+   // Do not infer a model year from browser or firmware release numbers.
+   var year=ua.match(/\b(?:model[_-]?year|tv[_-]?year)[\s:=\/]+(20(?:1[7-9]|2[0-9]))\b/i);
+   if(year)values.model_year=parseInt(year[1],10);
+   return values;
+  }
   function http(action, fields, cb) {
     if (busy || !opened) return;
     busy = true;
@@ -158,7 +169,8 @@
         finish('18 saniyede yanıt tamamlanamadı. TV ağ bağlantısını kontrol edin.');
       }, 19000);
       var payload = {action: action, platform: 'vestel_foxxum', app_version: 'foxxum-v2.4-test'};
-      var k;
+      var k, metadata=foxxumMetadata();
+      for (k in metadata) if (Object.prototype.hasOwnProperty.call(metadata, k)) payload[k] = metadata[k];
       for (k in fields) if (Object.prototype.hasOwnProperty.call(fields, k)) payload[k] = fields[k];
       xhr.send(JSON.stringify(payload));
     } catch (e) { finish('Eski TV tarayıcısı ağ isteğini başlatamadı.', {}); }
