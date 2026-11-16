@@ -12,6 +12,9 @@
   var focus = 0;
   var registered = false;
   var lastState = '';
+  function save(k,v) { try { window.localStorage.setItem(k,v);return true; } catch(e) { return false; } }
+  function read(k) { try { return window.localStorage.getItem(k)||''; } catch(e) { return ''; } }
+  function del(k) { try { window.localStorage.removeItem(k); } catch(e) {} }
   function el(id) { return document.getElementById(id); }
   function put(id, value) { var e = el(id); if (e) e.textContent = String(value); }
   function validDevice(x) {
